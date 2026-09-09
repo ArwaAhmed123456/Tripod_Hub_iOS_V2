@@ -48,6 +48,7 @@ const fmt = (l, siteNameMap = {}) => {
     sign_out_time: signOutIso,
     duration:    l.hours ? `${l.hours}h` : null,
     trade:       l.trade,
+    employee_company_name: l.employeeCompanyName || l.employee_company_name || null,
     car_reg:     l.carReg,
     reason:      l.reason,
     image_url:   l.imageUrl,
@@ -61,6 +62,7 @@ const fmt = (l, siteNameMap = {}) => {
     checked_in_by:       l.checkedInBy      || '',
   };
 };
+
 
 const nowStr = () => {
   const n = new Date();
@@ -100,7 +102,7 @@ const onSiteFilter = { $or: [{ timeOut: { $exists: false } }, { timeOut: null },
 
 // ─── PUBLIC sign-in (no auth) — QR visitor check-in ─────────────────────────
 router.post('/public', async (req, res) => {
-  const { site_id, name, group, trade, car_reg, reason, photo_base64 } = req.body;
+  const { site_id, name, group, trade, employee_company_name, car_reg, reason, photo_base64 } = req.body;
   if (!name) return res.status(400).json({ error: 'name is required' });
   try {
     let site = null;
@@ -111,10 +113,13 @@ router.post('/public', async (req, res) => {
     const now     = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const imageUrl = photo_base64 ? savePhoto(photo_base64) : null;
+    const userType = group || 'Visitor';
+    const empCompany = (String(userType).toLowerCase().includes('employee') && employee_company_name) ? employee_company_name.trim() : null;
 
     const log = await ActivityLog.create({
       siteId: site._id, name: name.trim(),
-      userType: group || 'Visitor',
+      userType,
+      employeeCompanyName: empCompany,
       trade: trade || '', carReg: car_reg || '', reason: reason || '',
       date: dateStr, timeIn: nowStr(), checkIn: now, imageUrl,
     });
@@ -218,7 +223,7 @@ router.get('/', verifyAdmin, async (req, res) => {
 
 // ─── POST /api/visits ─────────────────────────────────────────────────────────
 router.post('/', async (req, res) => {
-  const { site_id, member_id, name, group, trade, car_reg, company_name, reason, notes } = req.body;
+  const { site_id, member_id, name, group, trade, employee_company_name, car_reg, company_name, reason, notes } = req.body;
   if (!name && !member_id) return res.status(400).json({ error: 'name or member_id is required' });
   try {
     const sid = await resolveFirst(site_id);
@@ -231,9 +236,12 @@ router.post('/', async (req, res) => {
       const m = await Member.findById(member_id).lean();
       if (m) displayName = `${m.firstName} ${m.lastName || ''}`.trim();
     }
+    const userType = group || 'Visitor';
+    const empCompany = (String(userType).toLowerCase().includes('employee') && employee_company_name) ? employee_company_name.trim() : null;
+
     const log = await ActivityLog.create({
       siteId: sid, memberId: member_id || null, name: displayName,
-      userType: group || 'Visitor', trade: company_name || trade || '', carReg: car_reg || '',
+      userType, employeeCompanyName: empCompany, trade: company_name || trade || '', carReg: car_reg || '',
       reason: reason || notes || '', date: dateStr, timeIn: nowStr(), checkIn: now,
     });
 

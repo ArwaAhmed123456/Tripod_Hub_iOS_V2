@@ -7,7 +7,7 @@ function _getOrCreate(code) {
   return cache.get(code);
 }
 const fmt = (l) => ({ ...l._doc || l, _id: l._id||l.id, id: (l._id||l.id)?.toString(),
-  time_in: l.timeIn, time_out: l.timeOut, user_type: l.userType, car_reg: l.carReg, image_url: l.imageUrl });
+  time_in: l.timeIn, time_out: l.timeOut, user_type: l.userType, employee_company_name: l.employeeCompanyName || l.employee_company_name || null, car_reg: l.carReg, image_url: l.imageUrl });
 
 async function seedFromDB(projectCode) {
   try {

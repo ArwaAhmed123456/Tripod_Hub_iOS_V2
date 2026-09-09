@@ -1,10 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarDays,
+  Camera,
   CheckCircle2,
   ChevronDown,
   Download,
   Filter,
+  ImagePlus,
   LogOut,
   MoreHorizontal,
   Pencil,
@@ -1394,6 +1396,25 @@ const PreRegTab = ({ siteId, siteName, groups, onVisitsChanged }) => {
   );
 };
 
+// ── Helpers: client-side image compression via canvas ───────────────────────
+const compressImage = (file, maxPx = 1280, qualityJpeg = 0.82) =>
+  new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compression failed')), 'image/jpeg', qualityJpeg);
+    };
+    img.onerror = reject;
+    img.src = url;
+  });
+
 // ── Deliveries Tab ───────────────────────────────────────────────────────────
 const DeliveriesTab = ({ siteId, siteName }) => {
   const [deliveries, setDeliveries] = useState([]);
@@ -1402,8 +1423,17 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ recipient: '', sender: '', carrier: '', notes: '' });
   const [saving, setSaving] = useState(false);
+  const [imageFile, setImageFile] = useState(null);   // raw File from picker
+  const [imagePreview, setImagePreview] = useState(null); // object URL for <img>
+  const [expandedId, setExpandedId] = useState(null); // row expanded for image preview
+  const fileInputRef = React.useRef(null);
+
+  const API_BASE = import.meta.env.VITE_API_URL || '';
 
   useEffect(() => { if (siteId) fetchDeliveries(); }, [siteId]);
+
+  // Cleanup object URLs on unmount
+  useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview); }, [imagePreview]);
 
   const fetchDeliveries = async () => {
     setLoading(true);
@@ -1414,15 +1444,54 @@ const DeliveriesTab = ({ siteId, siteName }) => {
     finally { setLoading(false); }
   };
 
+  const handleImageSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      const compressedFile = new File([compressed], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImageFile(compressedFile);
+      setImagePreview(URL.createObjectURL(compressedFile));
+    } catch {
+      toast.error('Could not process image — please try another file');
+    }
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  };
+
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+  };
+
+  const resetModal = () => {
+    setShowModal(false);
+    setForm({ recipient: '', sender: '', carrier: '', notes: '' });
+    removeImage();
+  };
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.recipient.trim()) return;
     setSaving(true);
     try {
-      await api.post('/deliveries', { site_id: siteId, ...form });
+      if (imageFile) {
+        // Multipart upload with image
+        const fd = new FormData();
+        fd.append('site_id', siteId);
+        fd.append('recipient', form.recipient);
+        fd.append('sender', form.sender);
+        fd.append('carrier', form.carrier);
+        fd.append('notes', form.notes);
+        fd.append('delivery_image', imageFile, imageFile.name);
+        await api.post('/deliveries', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      } else {
+        await api.post('/deliveries', { site_id: siteId, ...form });
+      }
       toast.success('Delivery recorded');
-      setShowModal(false);
-      setForm({ recipient: '', sender: '', carrier: '', notes: '' });
+      resetModal();
       fetchDeliveries();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to record delivery');
@@ -1478,35 +1547,63 @@ const DeliveriesTab = ({ siteId, siteName }) => {
               <th className="px-4 py-3">Carrier</th>
               <th className="px-4 py-3">Received</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3 text-center">Photo</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(d => (
-              <tr key={d._id || d.id} className="hover:bg-slate-50">
-                <td className="px-4 py-3 font-medium text-slate-800">{d.recipient}</td>
-                <td className="px-4 py-3 text-slate-600">{d.sender || '--'}</td>
-                <td className="px-4 py-3 text-slate-600">{d.carrier || '--'}</td>
-                <td className="px-4 py-3 text-slate-600">
-                  {d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--'}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${d.collected ? 'bg-blue-100 text-[#2b4594]' : 'bg-slate-100 text-slate-600'}`}>
-                    {d.collected ? 'Collected' : 'Awaiting collection'}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {!d.collected && (
-                    <button
-                      type="button"
-                      onClick={() => handleCollect(d._id || d.id)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]"
-                    >
-                      <CheckCircle2 size={13} /> Collect
-                    </button>
-                  )}
-                </td>
-              </tr>
+              <React.Fragment key={d._id || d.id}>
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-3 font-medium text-slate-800">{d.recipient}</td>
+                  <td className="px-4 py-3 text-slate-600">{d.sender || '--'}</td>
+                  <td className="px-4 py-3 text-slate-600">{d.carrier || '--'}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '--'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${d.collected ? 'bg-blue-100 text-[#2b4594]' : 'bg-slate-100 text-slate-600'}`}>
+                      {d.collected ? 'Collected' : 'Awaiting collection'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {d.deliveryImageUrl ? (
+                      <button
+                        type="button"
+                        title="View delivery photo"
+                        onClick={() => setExpandedId(expandedId === (d._id || d.id) ? null : (d._id || d.id))}
+                        className="inline-flex items-center justify-center rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:bg-blue-50 hover:text-[#2b4594] transition-colors"
+                      >
+                        <Camera size={15} />
+                      </button>
+                    ) : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {!d.collected && (
+                      <button
+                        type="button"
+                        onClick={() => handleCollect(d._id || d.id)}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]"
+                      >
+                        <CheckCircle2 size={13} /> Collect
+                      </button>
+                    )}
+                  </td>
+                </tr>
+                {/* Expandable photo row */}
+                {expandedId === (d._id || d.id) && d.deliveryImageUrl && (
+                  <tr>
+                    <td colSpan={7} className="bg-slate-50 px-6 pb-4 pt-2">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Delivery Picture</p>
+                      <img
+                        src={`${API_BASE}${d.deliveryImageUrl}`}
+                        alt="Delivery"
+                        className="max-h-64 max-w-sm rounded-xl border border-slate-200 object-contain shadow-sm"
+                      />
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -1529,10 +1626,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+          <div className="w-full max-w-md overflow-y-auto max-h-[90vh] rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <h2 className="text-xl font-semibold text-slate-800">Log a delivery</h2>
-              <button type="button" onClick={() => setShowModal(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X size={16} /></button>
+              <button type="button" onClick={resetModal} className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X size={16} /></button>
             </div>
             <form onSubmit={handleCreate} className="space-y-4 p-6">
               <div>
@@ -1555,8 +1652,59 @@ const DeliveriesTab = ({ siteId, siteName }) => {
                 <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]" />
               </div>
+
+              {/* ── Delivery Picture ──────────────────────────────────────── */}
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">
+                  Delivery Picture
+                  <span className="ml-1.5 text-xs font-normal text-slate-400">(Optional)</span>
+                </label>
+                {imagePreview ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="h-36 w-full max-w-xs rounded-xl border border-slate-200 object-cover shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={removeImage}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow hover:bg-red-600"
+                      title="Remove photo"
+                    >
+                      <X size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="mt-2 flex items-center gap-1.5 text-xs font-medium text-[#2b4594] hover:underline"
+                    >
+                      <Camera size={13} /> Retake / Replace
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500 hover:border-[#2b4594] hover:text-[#2b4594] transition-colors"
+                  >
+                    <ImagePlus size={18} />
+                    <span>Tap to upload or capture photo</span>
+                  </button>
+                )}
+                {/* Hidden file input: accept="image/*" + capture="environment" triggers camera on mobile */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+              </div>
+
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowModal(false)}
+                <button type="button" onClick={resetModal}
                   className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
                 <button type="submit" disabled={saving}
                   className="rounded-lg bg-[#2b4594] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1e326e] disabled:opacity-60">

@@ -5,6 +5,7 @@ const logSchema = new mongoose.Schema({
     project_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', required: true, index: true },
     name:      { type: String, required: true, trim: true },
     trade:     { type: String, trim: true },
+    employee_company_name: { type: String, default: null, trim: true },
     car_reg:   { type: String, trim: true },
     user_type: { type: String, default: 'Employee' },
     time_in:   { type: String, required: true },

@@ -13,6 +13,8 @@ const deliverySchema = new mongoose.Schema({
   notes:     { type: String, default: '' },
   collected: { type: Boolean, default: false },
   collectedAt: { type: Date, default: null },
+  // Optional delivery picture — stores relative URL e.g. /uploads/deliveries/abc123.jpg
+  deliveryImageUrl: { type: String, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Delivery', deliverySchema);

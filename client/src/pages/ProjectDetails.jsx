@@ -36,6 +36,7 @@ const ProjectDetails = () => {
         trade: '',
         car_reg: '',
         user_type: 'Employee',
+        employee_company_name: '',
         time_in: '',
         time_out: '',
         date: new Date().toISOString().split('T')[0]
@@ -148,6 +149,7 @@ const ProjectDetails = () => {
             trade: '',
             car_reg: '',
             user_type: 'Employee',
+            employee_company_name: '',
             time_in: '',
             time_out: '',
             date: new Date().toISOString().split('T')[0]
@@ -184,6 +186,7 @@ const ProjectDetails = () => {
         const matchesSearch = log.name.toLowerCase().includes(search.toLowerCase()) ||
                               formatDateUK(log.date).includes(search) ||
                               log.trade?.toLowerCase().includes(search.toLowerCase()) ||
+                              log.employee_company_name?.toLowerCase().includes(search.toLowerCase()) ||
                               log.user_type?.toLowerCase().includes(search.toLowerCase());
 
         let matchesDateRange = true;
@@ -324,6 +327,7 @@ const ProjectDetails = () => {
                     Date: formatDateUK(log.date),
                     Name: log.name,
                     Company: log.trade || '-',
+                    'Employee Company Name': log.employee_company_name || '-',
                     'Car Reg': log.car_reg || '-',
                     'User Type': log.user_type || 'Employee',
                     'Time In': log.time_in,
@@ -388,7 +392,11 @@ const ProjectDetails = () => {
                                         <button
                                             key={type}
                                             type="button"
-                                            onClick={() => setNewLog({ ...newLog, user_type: type })}
+                                            onClick={() => setNewLog(prev => ({
+                                                ...prev,
+                                                user_type: type,
+                                                employee_company_name: type === 'Employee' ? (prev.employee_company_name || '') : ''
+                                            }))}
                                             className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${newLog.user_type === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
                                         >
                                             {type}
@@ -396,6 +404,20 @@ const ProjectDetails = () => {
                                     ))}
                                 </div>
                             </div>
+                            {newLog.user_type === 'Employee' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-600 mb-1">
+                                        Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                                    </label>
+                                    <input
+                                        name="employee_company_name"
+                                        value={newLog.employee_company_name || ''}
+                                        onChange={handleAddChange}
+                                        className="w-full p-3 border rounded-lg bg-slate-50"
+                                        placeholder="Enter employee company name"
+                                    />
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-600 mb-1">Time In <span className="text-red-500">*</span></label>
@@ -441,6 +463,39 @@ const ProjectDetails = () => {
                                     <input name="car_reg" value={editingLog.car_reg || ''} onChange={handleEditChange} className="w-full p-3 border rounded-lg bg-slate-50" />
                                 </div>
                             </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-600 mb-2">User Type</label>
+                                <div className="flex bg-slate-50 p-1 rounded-lg border">
+                                    {['Employee', 'Visitor'].map(type => (
+                                        <button
+                                            key={type}
+                                            type="button"
+                                            onClick={() => setEditingLog(prev => ({
+                                                ...prev,
+                                                user_type: type,
+                                                employee_company_name: type === 'Employee' ? (prev.employee_company_name || '') : ''
+                                            }))}
+                                            className={`flex-1 py-1.5 rounded-md text-sm font-medium transition ${(editingLog.user_type || 'Employee') === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+                                        >
+                                            {type}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            {(editingLog.user_type || 'Employee') === 'Employee' && (
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-600 mb-1">
+                                        Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                                    </label>
+                                    <input
+                                        name="employee_company_name"
+                                        value={editingLog.employee_company_name || ''}
+                                        onChange={handleEditChange}
+                                        className="w-full p-3 border rounded-lg bg-slate-50"
+                                        placeholder="Enter employee company name"
+                                    />
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-600 mb-1">Time In</label>
@@ -667,7 +722,12 @@ const ProjectDetails = () => {
                                 <tr key={log.id} className="hover:bg-gray-50 group">
                                     <td className="p-4 text-gray-600">{formatDateUK(log.date)}</td>
                                     <td className="p-4 font-medium text-gray-900">{log.name}</td>
-                                    <td className="p-4 text-gray-600">{log.trade}</td>
+                                    <td className="p-4 text-gray-600">
+                                        <div>{log.trade || '-'}</div>
+                                        {log.employee_company_name && (
+                                            <div className="text-xs text-slate-400 font-normal">Emp: {log.employee_company_name}</div>
+                                        )}
+                                    </td>
                                     <td className="p-4 text-gray-600 font-mono text-sm">{log.car_reg || '-'}</td>
                                     <td className="p-4 text-center">
                                         {log.image_url ? (

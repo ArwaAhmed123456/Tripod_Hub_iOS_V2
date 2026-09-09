@@ -17387,33 +17387,33 @@ const createLucideIcon = (iconName, iconNode) => {
   Component.displayName = toPascalCase(iconName);
   return Component;
 };
-const __iconNode$11 = [
+const __iconNode$12 = [
   ["rect", { width: "20", height: "5", x: "2", y: "3", rx: "1", key: "1wp1u1" }],
   ["path", { d: "M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8", key: "1s80jp" }],
   ["path", { d: "M10 12h4", key: "a56b0p" }]
 ];
-const Archive = createLucideIcon("archive", __iconNode$11);
-const __iconNode$10 = [
+const Archive = createLucideIcon("archive", __iconNode$12);
+const __iconNode$11 = [
   ["path", { d: "M12 5v14", key: "s699le" }],
   ["path", { d: "m19 12-7 7-7-7", key: "1idqje" }]
 ];
-const ArrowDown = createLucideIcon("arrow-down", __iconNode$10);
-const __iconNode$$ = [
+const ArrowDown = createLucideIcon("arrow-down", __iconNode$11);
+const __iconNode$10 = [
   ["path", { d: "m12 19-7-7 7-7", key: "1l729n" }],
   ["path", { d: "M19 12H5", key: "x3x0zl" }]
 ];
-const ArrowLeft = createLucideIcon("arrow-left", __iconNode$$);
-const __iconNode$_ = [
+const ArrowLeft = createLucideIcon("arrow-left", __iconNode$10);
+const __iconNode$$ = [
   ["path", { d: "M5 12h14", key: "1ays0h" }],
   ["path", { d: "m12 5 7 7-7 7", key: "xquz4c" }]
 ];
-const ArrowRight = createLucideIcon("arrow-right", __iconNode$_);
-const __iconNode$Z = [
+const ArrowRight = createLucideIcon("arrow-right", __iconNode$$);
+const __iconNode$_ = [
   ["path", { d: "m5 12 7-7 7 7", key: "hav0vg" }],
   ["path", { d: "M12 19V5", key: "x0mq9r" }]
 ];
-const ArrowUp = createLucideIcon("arrow-up", __iconNode$Z);
-const __iconNode$Y = [
+const ArrowUp = createLucideIcon("arrow-up", __iconNode$_);
+const __iconNode$Z = [
   ["path", { d: "M10.268 21a2 2 0 0 0 3.464 0", key: "vwvbt9" }],
   [
     "path",
@@ -17424,8 +17424,8 @@ const __iconNode$Y = [
   ],
   ["circle", { cx: "18", cy: "8", r: "3", key: "1g0gzu" }]
 ];
-const BellDot = createLucideIcon("bell-dot", __iconNode$Y);
-const __iconNode$X = [
+const BellDot = createLucideIcon("bell-dot", __iconNode$Z);
+const __iconNode$Y = [
   ["path", { d: "M10.268 21a2 2 0 0 0 3.464 0", key: "vwvbt9" }],
   ["path", { d: "M22 8c0-2.3-.8-4.3-2-6", key: "5bb3ad" }],
   [
@@ -17437,8 +17437,8 @@ const __iconNode$X = [
   ],
   ["path", { d: "M4 2C2.8 3.7 2 5.7 2 8", key: "tap9e0" }]
 ];
-const BellRing = createLucideIcon("bell-ring", __iconNode$X);
-const __iconNode$W = [
+const BellRing = createLucideIcon("bell-ring", __iconNode$Y);
+const __iconNode$X = [
   ["path", { d: "M10.268 21a2 2 0 0 0 3.464 0", key: "vwvbt9" }],
   [
     "path",
@@ -17448,8 +17448,8 @@ const __iconNode$W = [
     }
   ]
 ];
-const Bell = createLucideIcon("bell", __iconNode$W);
-const __iconNode$V = [
+const Bell = createLucideIcon("bell", __iconNode$X);
+const __iconNode$W = [
   ["path", { d: "M12 7v14", key: "1akyts" }],
   [
     "path",
@@ -17459,8 +17459,8 @@ const __iconNode$V = [
     }
   ]
 ];
-const BookOpen = createLucideIcon("book-open", __iconNode$V);
-const __iconNode$U = [
+const BookOpen = createLucideIcon("book-open", __iconNode$W);
+const __iconNode$V = [
   ["path", { d: "M10 12h4", key: "a56b0p" }],
   ["path", { d: "M10 8h4", key: "1sr2af" }],
   ["path", { d: "M14 21v-3a2 2 0 0 0-4 0v3", key: "1rgiei" }],
@@ -17473,8 +17473,8 @@ const __iconNode$U = [
   ],
   ["path", { d: "M6 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16", key: "16ra0t" }]
 ];
-const Building2 = createLucideIcon("building-2", __iconNode$U);
-const __iconNode$T = [
+const Building2 = createLucideIcon("building-2", __iconNode$V);
+const __iconNode$U = [
   ["path", { d: "M8 2v4", key: "1cmpym" }],
   ["path", { d: "M16 2v4", key: "4m81vk" }],
   ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
@@ -17486,15 +17486,15 @@ const __iconNode$T = [
   ["path", { d: "M12 18h.01", key: "mhygvu" }],
   ["path", { d: "M16 18h.01", key: "kzsmim" }]
 ];
-const CalendarDays = createLucideIcon("calendar-days", __iconNode$T);
-const __iconNode$S = [
+const CalendarDays = createLucideIcon("calendar-days", __iconNode$U);
+const __iconNode$T = [
   ["path", { d: "M8 2v4", key: "1cmpym" }],
   ["path", { d: "M16 2v4", key: "4m81vk" }],
   ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
   ["path", { d: "M3 10h18", key: "8toen8" }]
 ];
-const Calendar = createLucideIcon("calendar", __iconNode$S);
-const __iconNode$R = [
+const Calendar = createLucideIcon("calendar", __iconNode$T);
+const __iconNode$S = [
   [
     "path",
     {
@@ -17504,30 +17504,30 @@ const __iconNode$R = [
   ],
   ["circle", { cx: "12", cy: "13", r: "3", key: "1vg3eu" }]
 ];
-const Camera = createLucideIcon("camera", __iconNode$R);
-const __iconNode$Q = [["path", { d: "M20 6 9 17l-5-5", key: "1gmf2c" }]];
-const Check = createLucideIcon("check", __iconNode$Q);
-const __iconNode$P = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
-const ChevronDown = createLucideIcon("chevron-down", __iconNode$P);
-const __iconNode$O = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
-const ChevronRight = createLucideIcon("chevron-right", __iconNode$O);
-const __iconNode$N = [
+const Camera = createLucideIcon("camera", __iconNode$S);
+const __iconNode$R = [["path", { d: "M20 6 9 17l-5-5", key: "1gmf2c" }]];
+const Check = createLucideIcon("check", __iconNode$R);
+const __iconNode$Q = [["path", { d: "m6 9 6 6 6-6", key: "qrunsl" }]];
+const ChevronDown = createLucideIcon("chevron-down", __iconNode$Q);
+const __iconNode$P = [["path", { d: "m9 18 6-6-6-6", key: "mthhwq" }]];
+const ChevronRight = createLucideIcon("chevron-right", __iconNode$P);
+const __iconNode$O = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["line", { x1: "12", x2: "12", y1: "8", y2: "12", key: "1pkeuh" }],
   ["line", { x1: "12", x2: "12.01", y1: "16", y2: "16", key: "4dfq90" }]
 ];
-const CircleAlert = createLucideIcon("circle-alert", __iconNode$N);
-const __iconNode$M = [
+const CircleAlert = createLucideIcon("circle-alert", __iconNode$O);
+const __iconNode$N = [
   ["path", { d: "M21.801 10A10 10 0 1 1 17 3.335", key: "yps3ct" }],
   ["path", { d: "m9 11 3 3L22 4", key: "1pflzl" }]
 ];
-const CircleCheckBig = createLucideIcon("circle-check-big", __iconNode$M);
-const __iconNode$L = [
+const CircleCheckBig = createLucideIcon("circle-check-big", __iconNode$N);
+const __iconNode$M = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "m9 12 2 2 4-4", key: "dzmm74" }]
 ];
-const CircleCheck = createLucideIcon("circle-check", __iconNode$L);
-const __iconNode$K = [
+const CircleCheck = createLucideIcon("circle-check", __iconNode$M);
+const __iconNode$L = [
   [
     "path",
     {
@@ -17537,69 +17537,69 @@ const __iconNode$K = [
   ],
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
 ];
-const CirclePlay = createLucideIcon("circle-play", __iconNode$K);
-const __iconNode$J = [
+const CirclePlay = createLucideIcon("circle-play", __iconNode$L);
+const __iconNode$K = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", key: "1u773s" }],
   ["path", { d: "M12 17h.01", key: "p32p05" }]
 ];
-const CircleQuestionMark = createLucideIcon("circle-question-mark", __iconNode$J);
-const __iconNode$I = [
+const CircleQuestionMark = createLucideIcon("circle-question-mark", __iconNode$K);
+const __iconNode$J = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["circle", { cx: "12", cy: "10", r: "3", key: "ilqhr7" }],
   ["path", { d: "M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662", key: "154egf" }]
 ];
-const CircleUser = createLucideIcon("circle-user", __iconNode$I);
-const __iconNode$H = [
+const CircleUser = createLucideIcon("circle-user", __iconNode$J);
+const __iconNode$I = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "m15 9-6 6", key: "1uzhvr" }],
   ["path", { d: "m9 9 6 6", key: "z0biqf" }]
 ];
-const CircleX = createLucideIcon("circle-x", __iconNode$H);
-const __iconNode$G = [
+const CircleX = createLucideIcon("circle-x", __iconNode$I);
+const __iconNode$H = [
   ["path", { d: "M12 6v6h4", key: "135r8i" }],
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
 ];
-const Clock3 = createLucideIcon("clock-3", __iconNode$G);
-const __iconNode$F = [
+const Clock3 = createLucideIcon("clock-3", __iconNode$H);
+const __iconNode$G = [
   ["path", { d: "M12 6v6l4 2", key: "mmk7yg" }],
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }]
 ];
-const Clock = createLucideIcon("clock", __iconNode$F);
-const __iconNode$E = [
+const Clock = createLucideIcon("clock", __iconNode$G);
+const __iconNode$F = [
   ["path", { d: "m16 18 6-6-6-6", key: "eg8j8" }],
   ["path", { d: "m8 6-6 6 6 6", key: "ppft3o" }]
 ];
-const Code = createLucideIcon("code", __iconNode$E);
-const __iconNode$D = [
+const Code = createLucideIcon("code", __iconNode$F);
+const __iconNode$E = [
   ["rect", { width: "14", height: "14", x: "8", y: "8", rx: "2", ry: "2", key: "17jyea" }],
   ["path", { d: "M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2", key: "zix9uf" }]
 ];
-const Copy = createLucideIcon("copy", __iconNode$D);
-const __iconNode$C = [
+const Copy = createLucideIcon("copy", __iconNode$E);
+const __iconNode$D = [
   ["rect", { width: "20", height: "14", x: "2", y: "5", rx: "2", key: "ynyp8z" }],
   ["line", { x1: "2", x2: "22", y1: "10", y2: "10", key: "1b3vmo" }]
 ];
-const CreditCard = createLucideIcon("credit-card", __iconNode$C);
-const __iconNode$B = [
+const CreditCard = createLucideIcon("credit-card", __iconNode$D);
+const __iconNode$C = [
   ["path", { d: "M12 15V3", key: "m9g1x1" }],
   ["path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4", key: "ih7n3h" }],
   ["path", { d: "m7 10 5 5 5-5", key: "brsn70" }]
 ];
-const Download = createLucideIcon("download", __iconNode$B);
-const __iconNode$A = [
+const Download = createLucideIcon("download", __iconNode$C);
+const __iconNode$B = [
   ["circle", { cx: "12", cy: "12", r: "1", key: "41hilf" }],
   ["circle", { cx: "19", cy: "12", r: "1", key: "1wjl8i" }],
   ["circle", { cx: "5", cy: "12", r: "1", key: "1pcz8c" }]
 ];
-const Ellipsis = createLucideIcon("ellipsis", __iconNode$A);
-const __iconNode$z = [
+const Ellipsis = createLucideIcon("ellipsis", __iconNode$B);
+const __iconNode$A = [
   ["path", { d: "M15 3h6v6", key: "1q9fwt" }],
   ["path", { d: "M10 14 21 3", key: "gplh6r" }],
   ["path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6", key: "a6xqqp" }]
 ];
-const ExternalLink = createLucideIcon("external-link", __iconNode$z);
-const __iconNode$y = [
+const ExternalLink = createLucideIcon("external-link", __iconNode$A);
+const __iconNode$z = [
   [
     "path",
     {
@@ -17617,8 +17617,8 @@ const __iconNode$y = [
   ],
   ["path", { d: "m2 2 20 20", key: "1ooewy" }]
 ];
-const EyeOff = createLucideIcon("eye-off", __iconNode$y);
-const __iconNode$x = [
+const EyeOff = createLucideIcon("eye-off", __iconNode$z);
+const __iconNode$y = [
   [
     "path",
     {
@@ -17628,8 +17628,8 @@ const __iconNode$x = [
   ],
   ["circle", { cx: "12", cy: "12", r: "3", key: "1v7zrd" }]
 ];
-const Eye = createLucideIcon("eye", __iconNode$x);
-const __iconNode$w = [
+const Eye = createLucideIcon("eye", __iconNode$y);
+const __iconNode$x = [
   [
     "path",
     {
@@ -17642,8 +17642,8 @@ const __iconNode$w = [
   ["path", { d: "M16 13H8", key: "t4e002" }],
   ["path", { d: "M16 17H8", key: "z1uh3a" }]
 ];
-const FileText = createLucideIcon("file-text", __iconNode$w);
-const __iconNode$v = [
+const FileText = createLucideIcon("file-text", __iconNode$x);
+const __iconNode$w = [
   [
     "path",
     {
@@ -17652,14 +17652,14 @@ const __iconNode$v = [
     }
   ]
 ];
-const Funnel = createLucideIcon("funnel", __iconNode$v);
-const __iconNode$u = [
+const Funnel = createLucideIcon("funnel", __iconNode$w);
+const __iconNode$v = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20", key: "13o1zl" }],
   ["path", { d: "M2 12h20", key: "9i4pu4" }]
 ];
-const Globe = createLucideIcon("globe", __iconNode$u);
-const __iconNode$t = [
+const Globe = createLucideIcon("globe", __iconNode$v);
+const __iconNode$u = [
   ["circle", { cx: "9", cy: "12", r: "1", key: "1vctgf" }],
   ["circle", { cx: "9", cy: "5", r: "1", key: "hp0tcf" }],
   ["circle", { cx: "9", cy: "19", r: "1", key: "fkjjf6" }],
@@ -17667,13 +17667,21 @@ const __iconNode$t = [
   ["circle", { cx: "15", cy: "5", r: "1", key: "19l28e" }],
   ["circle", { cx: "15", cy: "19", r: "1", key: "f4zoj3" }]
 ];
-const GripVertical = createLucideIcon("grip-vertical", __iconNode$t);
-const __iconNode$s = [
+const GripVertical = createLucideIcon("grip-vertical", __iconNode$u);
+const __iconNode$t = [
   ["path", { d: "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8", key: "1357e3" }],
   ["path", { d: "M3 3v5h5", key: "1xhq8a" }],
   ["path", { d: "M12 7v5l4 2", key: "1fdv2h" }]
 ];
-const History = createLucideIcon("history", __iconNode$s);
+const History = createLucideIcon("history", __iconNode$t);
+const __iconNode$s = [
+  ["path", { d: "M16 5h6", key: "1vod17" }],
+  ["path", { d: "M19 2v6", key: "4bpg5p" }],
+  ["path", { d: "M21 11.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7.5", key: "1ue2ih" }],
+  ["path", { d: "m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21", key: "1xmnt7" }],
+  ["circle", { cx: "9", cy: "9", r: "2", key: "af1f0g" }]
+];
+const ImagePlus = createLucideIcon("image-plus", __iconNode$s);
 const __iconNode$r = [
   ["path", { d: "m16 17 5-5-5-5", key: "1bji2h" }],
   ["path", { d: "M21 12H9", key: "dn1m92" }],
@@ -18105,6 +18113,7 @@ const MobileForm = () => {
   const [selectedGroup, setSelectedGroup] = reactExports.useState(null);
   const [name, setName] = reactExports.useState("");
   const [company, setCompany] = reactExports.useState("");
+  const [employeeCompanyName, setEmployeeCompanyName] = reactExports.useState("");
   const [visiting, setVisiting] = reactExports.useState("");
   const [visitingOpen, setVisitingOpen] = reactExports.useState(false);
   const [members, setMembers] = reactExports.useState([]);
@@ -18217,6 +18226,9 @@ const MobileForm = () => {
       formData.append("trade", company.trim() || "");
       formData.append("car_reg", carReg.trim() || "");
       formData.append("user_type", selectedGroup?.name || "Visitor");
+      if (selectedGroup?.name?.toLowerCase().includes("employee") && employeeCompanyName.trim()) {
+        formData.append("employee_company_name", employeeCompanyName.trim());
+      }
       formData.append("date", today2);
       formData.append("time_in", timeStr);
       if (visiting) formData.append("reason", `Visiting: ${visiting}`);
@@ -18276,6 +18288,9 @@ const MobileForm = () => {
         {
           onClick: () => {
             setSelectedGroup(g2);
+            if (!g2.name?.toLowerCase().includes("employee")) {
+              setEmployeeCompanyName("");
+            }
             setStep("details");
           },
           className: "w-full py-4 rounded-xl border border-slate-200 text-slate-700 text-base font-medium shadow-sm hover:border-slate-400 transition-colors bg-white",
@@ -18287,6 +18302,7 @@ const MobileForm = () => {
   }
   if (step === "details") {
     const isVisitor = selectedGroup?.name?.toLowerCase().includes("visitor");
+    const isEmployee = selectedGroup?.name?.toLowerCase().includes("employee");
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-h-screen bg-white flex flex-col", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between px-6 py-4 border-b border-slate-200", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-2xl font-semibold text-slate-900", children: "Details" }),
@@ -18332,6 +18348,22 @@ const MobileForm = () => {
               value: company,
               onChange: (e2) => setCompany(e2.target.value),
               placeholder: "Your company",
+              className: "w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+            }
+          )
+        ] }),
+        isEmployee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-sm font-medium text-slate-700", children: [
+            "Employee Company Name ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              type: "text",
+              value: employeeCompanyName,
+              onChange: (e2) => setEmployeeCompanyName(e2.target.value),
+              placeholder: "Enter employee company name",
               className: "w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
             }
           )
@@ -33228,7 +33260,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-IY3X42nt.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-PSTtO7Ey.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -65484,6 +65516,7 @@ const ProjectDetails = () => {
     trade: "",
     car_reg: "",
     user_type: "Employee",
+    employee_company_name: "",
     time_in: "",
     time_out: "",
     date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
@@ -65565,6 +65598,7 @@ const ProjectDetails = () => {
       trade: "",
       car_reg: "",
       user_type: "Employee",
+      employee_company_name: "",
       time_in: "",
       time_out: "",
       date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0]
@@ -65594,7 +65628,7 @@ const ProjectDetails = () => {
     }
   };
   const filteredLogs = logs.filter((log) => {
-    const matchesSearch = log.name.toLowerCase().includes(search.toLowerCase()) || formatDateUK(log.date).includes(search) || log.trade?.toLowerCase().includes(search.toLowerCase()) || log.user_type?.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = log.name.toLowerCase().includes(search.toLowerCase()) || formatDateUK(log.date).includes(search) || log.trade?.toLowerCase().includes(search.toLowerCase()) || log.employee_company_name?.toLowerCase().includes(search.toLowerCase()) || log.user_type?.toLowerCase().includes(search.toLowerCase());
     let matchesDateRange = true;
     if (startDate && endDate) {
       matchesDateRange = log.date >= startDate && log.date <= endDate;
@@ -65702,6 +65736,7 @@ const ProjectDetails = () => {
           Date: formatDateUK(log.date),
           Name: log.name,
           Company: log.trade || "-",
+          "Employee Company Name": log.employee_company_name || "-",
           "Car Reg": log.car_reg || "-",
           "User Type": log.user_type || "Employee",
           "Time In": log.time_in,
@@ -65765,12 +65800,32 @@ const ProjectDetails = () => {
             "button",
             {
               type: "button",
-              onClick: () => setNewLog({ ...newLog, user_type: type }),
+              onClick: () => setNewLog((prev) => ({
+                ...prev,
+                user_type: type,
+                employee_company_name: type === "Employee" ? prev.employee_company_name || "" : ""
+              })),
               className: `flex-1 py-1.5 rounded-md text-sm font-medium transition ${newLog.user_type === type ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`,
               children: type
             },
             type
           )) })
+        ] }),
+        newLog.user_type === "Employee" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block text-sm font-medium text-slate-600 mb-1", children: [
+            "Employee Company Name ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              name: "employee_company_name",
+              value: newLog.employee_company_name || "",
+              onChange: handleAddChange,
+              className: "w-full p-3 border rounded-lg bg-slate-50",
+              placeholder: "Enter employee company name"
+            }
+          )
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-4", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
@@ -65817,6 +65872,39 @@ const ProjectDetails = () => {
             /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-600 mb-1", children: "Car Reg" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("input", { name: "car_reg", value: editingLog.car_reg || "", onChange: handleEditChange, className: "w-full p-3 border rounded-lg bg-slate-50" })
           ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-600 mb-2", children: "User Type" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex bg-slate-50 p-1 rounded-lg border", children: ["Employee", "Visitor"].map((type) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "button",
+            {
+              type: "button",
+              onClick: () => setEditingLog((prev) => ({
+                ...prev,
+                user_type: type,
+                employee_company_name: type === "Employee" ? prev.employee_company_name || "" : ""
+              })),
+              className: `flex-1 py-1.5 rounded-md text-sm font-medium transition ${(editingLog.user_type || "Employee") === type ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`,
+              children: type
+            },
+            type
+          )) })
+        ] }),
+        (editingLog.user_type || "Employee") === "Employee" && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block text-sm font-medium text-slate-600 mb-1", children: [
+            "Employee Company Name ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              name: "employee_company_name",
+              value: editingLog.employee_company_name || "",
+              onChange: handleEditChange,
+              className: "w-full p-3 border rounded-lg bg-slate-50",
+              placeholder: "Enter employee company name"
+            }
+          )
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-4", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
@@ -66058,7 +66146,13 @@ const ProjectDetails = () => {
           filteredLogs.map((log) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-gray-50 group", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-4 text-gray-600", children: formatDateUK(log.date) }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-4 font-medium text-gray-900", children: log.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-4 text-gray-600", children: log.trade }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("td", { className: "p-4 text-gray-600", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("div", { children: log.trade || "-" }),
+              log.employee_company_name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "text-xs text-slate-400 font-normal", children: [
+                "Emp: ",
+                log.employee_company_name
+              ] })
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-4 text-gray-600 font-mono text-sm", children: log.car_reg || "-" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-4 text-center", children: log.image_url ? /* @__PURE__ */ jsxRuntimeExports.jsx(
               "button",
@@ -67796,6 +67890,23 @@ const PreRegTab = ({ siteId, siteName, groups, onVisitsChanged }) => {
     )
   ] });
 };
+const compressImage = (file, maxPx = 1280, qualityJpeg = 0.82) => new Promise((resolve, reject) => {
+  const img = new Image();
+  const url2 = URL.createObjectURL(file);
+  img.onload = () => {
+    const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+    const w2 = Math.round(img.width * scale);
+    const h2 = Math.round(img.height * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w2;
+    canvas.height = h2;
+    canvas.getContext("2d").drawImage(img, 0, 0, w2, h2);
+    URL.revokeObjectURL(url2);
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("Compression failed")), "image/jpeg", qualityJpeg);
+  };
+  img.onerror = reject;
+  img.src = url2;
+});
 const DeliveriesTab = ({ siteId, siteName }) => {
   const [deliveries, setDeliveries] = reactExports.useState([]);
   const [loading, setLoading] = reactExports.useState(false);
@@ -67803,9 +67914,17 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [showModal, setShowModal] = reactExports.useState(false);
   const [form, setForm] = reactExports.useState({ recipient: "", sender: "", carrier: "", notes: "" });
   const [saving, setSaving] = reactExports.useState(false);
+  const [imageFile, setImageFile] = reactExports.useState(null);
+  const [imagePreview, setImagePreview] = reactExports.useState(null);
+  const [expandedId, setExpandedId] = reactExports.useState(null);
+  const fileInputRef = React.useRef(null);
+  const API_BASE = "";
   reactExports.useEffect(() => {
     if (siteId) fetchDeliveries();
   }, [siteId]);
+  reactExports.useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
   const fetchDeliveries = async () => {
     setLoading(true);
     try {
@@ -67817,15 +67936,49 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       setLoading(false);
     }
   };
+  const handleImageSelect = async (e2) => {
+    const file = e2.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      const compressedFile = new File([compressed], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+      setImageFile(compressedFile);
+      setImagePreview(URL.createObjectURL(compressedFile));
+    } catch {
+      zt$1.error("Could not process image — please try another file");
+    }
+    e2.target.value = "";
+  };
+  const removeImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+  };
+  const resetModal = () => {
+    setShowModal(false);
+    setForm({ recipient: "", sender: "", carrier: "", notes: "" });
+    removeImage();
+  };
   const handleCreate = async (e2) => {
     e2.preventDefault();
     if (!form.recipient.trim()) return;
     setSaving(true);
     try {
-      await api.post("/deliveries", { site_id: siteId, ...form });
+      if (imageFile) {
+        const fd = new FormData();
+        fd.append("site_id", siteId);
+        fd.append("recipient", form.recipient);
+        fd.append("sender", form.sender);
+        fd.append("carrier", form.carrier);
+        fd.append("notes", form.notes);
+        fd.append("delivery_image", imageFile, imageFile.name);
+        await api.post("/deliveries", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      } else {
+        await api.post("/deliveries", { site_id: siteId, ...form });
+      }
       zt$1.success("Delivery recorded");
-      setShowModal(false);
-      setForm({ recipient: "", sender: "", carrier: "", notes: "" });
+      resetModal();
       fetchDeliveries();
     } catch (err) {
       zt$1.error(err.response?.data?.error || "Failed to record delivery");
@@ -67878,26 +68031,50 @@ const DeliveriesTab = ({ siteId, siteName }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-3", children: "Carrier" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-3", children: "Received" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-3", children: "Status" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-3 text-center", children: "Photo" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-4 py-3 text-right", children: "Actions" })
         ] }) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { className: "divide-y divide-slate-100", children: filtered.map((d2) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-slate-50", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 font-medium text-slate-800", children: d2.recipient }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.sender || "--" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.carrier || "--" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "--" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${d2.collected ? "bg-blue-100 text-[#2b4594]" : "bg-slate-100 text-slate-600"}`, children: d2.collected ? "Collected" : "Awaiting collection" }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-right", children: !d2.collected && /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            "button",
-            {
-              type: "button",
-              onClick: () => handleCollect(d2._id || d2.id),
-              className: "inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheck, { size: 13 }),
-                " Collect"
-              ]
-            }
-          ) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { className: "divide-y divide-slate-100", children: filtered.map((d2) => /* @__PURE__ */ jsxRuntimeExports.jsxs(React.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-slate-50", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 font-medium text-slate-800", children: d2.recipient }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.sender || "--" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.carrier || "--" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-slate-600", children: d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "--" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${d2.collected ? "bg-blue-100 text-[#2b4594]" : "bg-slate-100 text-slate-600"}`, children: d2.collected ? "Collected" : "Awaiting collection" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-center", children: d2.deliveryImageUrl ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                title: "View delivery photo",
+                onClick: () => setExpandedId(expandedId === (d2._id || d2.id) ? null : d2._id || d2.id),
+                className: "inline-flex items-center justify-center rounded-lg bg-slate-100 p-1.5 text-slate-500 hover:bg-blue-50 hover:text-[#2b4594] transition-colors",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx(Camera, { size: 15 })
+              }
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-300", children: "—" }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-4 py-3 text-right", children: !d2.collected && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => handleCollect(d2._id || d2.id),
+                className: "inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(CircleCheck, { size: 13 }),
+                  " Collect"
+                ]
+              }
+            ) })
+          ] }),
+          expandedId === (d2._id || d2.id) && d2.deliveryImageUrl && /* @__PURE__ */ jsxRuntimeExports.jsx("tr", { children: /* @__PURE__ */ jsxRuntimeExports.jsxs("td", { colSpan: 7, className: "bg-slate-50 px-6 pb-4 pt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500", children: "Delivery Picture" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "img",
+              {
+                src: `${API_BASE}${d2.deliveryImageUrl}`,
+                alt: "Delivery",
+                className: "max-h-64 max-w-sm rounded-xl border border-slate-200 object-contain shadow-sm"
+              }
+            )
+          ] }) })
         ] }, d2._id || d2.id)) })
       ] }),
       !loading && filtered.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-center gap-3 py-16 text-slate-400", children: [
@@ -67919,10 +68096,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       ] }),
       loading && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "py-12 text-center text-sm text-slate-500", children: "Loading deliveries..." })
     ] }),
-    showModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl", children: [
+    showModal && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "w-full max-w-md overflow-y-auto max-h-[90vh] rounded-2xl bg-white shadow-2xl", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between border-b border-slate-200 px-6 py-4", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-semibold text-slate-800", children: "Log a delivery" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: () => setShowModal(false), className: "rounded-full p-2 text-slate-400 hover:bg-slate-100", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 16 }) })
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: resetModal, className: "rounded-full p-2 text-slate-400 hover:bg-slate-100", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 16 }) })
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { onSubmit: handleCreate, className: "space-y-4 p-6", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
@@ -67972,12 +68149,72 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             }
           )
         ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: [
+            "Delivery Picture",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "ml-1.5 text-xs font-normal text-slate-400", children: "(Optional)" })
+          ] }),
+          imagePreview ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "relative inline-block", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "img",
+              {
+                src: imagePreview,
+                alt: "Preview",
+                className: "h-36 w-full max-w-xs rounded-xl border border-slate-200 object-cover shadow-sm"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "button",
+              {
+                type: "button",
+                onClick: removeImage,
+                className: "absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white shadow hover:bg-red-600",
+                title: "Remove photo",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 12 })
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "button",
+              {
+                type: "button",
+                onClick: () => fileInputRef.current?.click(),
+                className: "mt-2 flex items-center gap-1.5 text-xs font-medium text-[#2b4594] hover:underline",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Camera, { size: 13 }),
+                  " Retake / Replace"
+                ]
+              }
+            )
+          ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "button",
+            {
+              type: "button",
+              onClick: () => fileInputRef.current?.click(),
+              className: "flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm font-medium text-slate-500 hover:border-[#2b4594] hover:text-[#2b4594] transition-colors",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ImagePlus, { size: 18 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Tap to upload or capture photo" })
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "input",
+            {
+              ref: fileInputRef,
+              type: "file",
+              accept: "image/*",
+              capture: "environment",
+              onChange: handleImageSelect,
+              className: "hidden"
+            }
+          )
+        ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-end gap-3 pt-2", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "button",
             {
               type: "button",
-              onClick: () => setShowModal(false),
+              onClick: resetModal,
               className: "rounded-lg border border-slate-300 px-5 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50",
               children: "Cancel"
             }
@@ -77695,6 +77932,7 @@ const PublicVisitorCheckIn = () => {
   const [visitId, setVisitId] = reactExports.useState(null);
   const [name, setName] = reactExports.useState("");
   const [company, setCompany] = reactExports.useState("");
+  const [employeeCompanyName, setEmployeeCompanyName] = reactExports.useState("");
   const [visiting, setVisiting] = reactExports.useState("");
   const [carReg, setCarReg] = reactExports.useState("");
   const [nameError, setNameError] = reactExports.useState("");
@@ -77847,11 +78085,13 @@ const PublicVisitorCheckIn = () => {
     setSubmitting(true);
     setSubmitError("");
     try {
+      const isEmp = selectedGroup?.name?.toLowerCase().includes("employee");
       const res = await publicApi.post("/visits/public", {
         site_id: siteId,
         name: name.trim(),
         group: selectedGroup?.name || "Visitor",
         trade: company.trim() || void 0,
+        employee_company_name: isEmp && employeeCompanyName.trim() ? employeeCompanyName.trim() : void 0,
         car_reg: carReg.trim() || void 0,
         reason: visiting.trim() || void 0,
         photo_base64: photoDataUrl || void 0
@@ -77930,6 +78170,9 @@ const PublicVisitorCheckIn = () => {
         {
           onClick: () => {
             setSelectedGroup(g2);
+            if (!g2.name?.toLowerCase().includes("employee")) {
+              setEmployeeCompanyName("");
+            }
             goToStep("details");
           },
           className: "w-full text-left px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-medium text-base hover:border-slate-400 active:bg-slate-50 transition-colors shadow-sm",
@@ -77979,6 +78222,24 @@ const PublicVisitorCheckIn = () => {
               }
             ),
             company && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setCompany(""), className: "ml-2 text-slate-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 16 }) })
+          ] })
+        ] }),
+        selectedGroup?.name?.toLowerCase().includes("employee") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block text-sm font-medium text-slate-700 mb-1", children: [
+            "Employee Company Name ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "input",
+              {
+                value: employeeCompanyName,
+                onChange: (e2) => setEmployeeCompanyName(e2.target.value),
+                placeholder: "Enter employee company name",
+                className: "flex-1 text-base text-slate-900 outline-none bg-transparent"
+              }
+            ),
+            employeeCompanyName && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setEmployeeCompanyName(""), className: "ml-2 text-slate-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 16 }) })
           ] })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [

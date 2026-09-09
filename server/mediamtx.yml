@@ -1,0 +1,38 @@
+# MediaMTX Configuration for Tripod Security Camera Gateway
+# Converts RTSP from IP cameras to WebRTC (WHEP) and HLS for browser and mobile playback.
+
+logLevel: info
+logDestinations: [stdout]
+
+# RTSP listening port (if cameras push RTSP to this server)
+rtsp: yes
+protocols: [tcp, udp]
+rtspAddress: :8554
+
+# WebRTC (WHEP) listening port for ultra-low-latency browser / mobile streaming (< 500ms delay)
+webrtc: yes
+webrtcAddress: :8889
+webrtcEncryption: no
+webrtcAllowFrameDropping: yes
+
+# HLS listening port for universal browser / iOS fallback
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsVariant: lowLatency
+hlsSegmentCount: 5
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+
+# Path definitions
+# MediaMTX supports on-demand pulling from cameras when a manager connects.
+paths:
+  # Catch-all on-demand RTSP proxy path
+  # Example: requesting /cam_site_gate pulls from the configured RTSP stream
+  all_others:
+    # On-demand source pull:
+    # source: rtsp://username:password@camera-ip:554/stream1
+    # sourceOnDemand: yes
+    # sourceOnDemandStartTimeout: 10s
+    # sourceOnDemandCloseAfter: 10s
+    source: publisher

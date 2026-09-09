@@ -24,7 +24,7 @@ const storage = multer.diskStorage({
 const upload = multer({storage});
 
 const fmt = (l) => ({ ...l, _id:l._id, id:l._id?.toString(), project_id:l.siteId,
-  time_in:l.timeIn, time_out:l.timeOut, user_type:l.userType, car_reg:l.carReg, image_url:l.imageUrl, created_at:l.createdAt });
+  time_in:l.timeIn, time_out:l.timeOut, user_type:l.userType, employee_company_name:l.employeeCompanyName || l.employee_company_name || null, car_reg:l.carReg, image_url:l.imageUrl, created_at:l.createdAt });
 
 const nowStr = () => { const n=new Date(); return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`; };
 
@@ -40,14 +40,15 @@ router.get('/', async (req,res) => {
 });
 
 router.post('/', upload.single('image'), async (req,res) => {
-  const {project_code,name,trade,car_reg,user_type,time_in,time_out,date,reason}=req.body;
+  const {project_code,name,trade,car_reg,user_type,employee_company_name,time_in,time_out,date,reason}=req.body;
   if (!project_code||!name||!time_in||!date) return res.status(400).json({error:'Missing required fields'});
   try {
     const site=await Site.findOne({code:project_code.trim().toUpperCase()}).lean();
     if (!site) return res.status(400).json({error:'Invalid project code'});
     let hours=null;
     if (time_out) { const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`); hours=parseFloat(((ms<0?ms+86400000:ms)/3600000).toFixed(2)); }
-    const data={siteId:site._id,name,trade:trade||'',carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date,reason:reason||''};
+    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    const data={siteId:site._id,name,trade:trade||'',employeeCompanyName:empCompany,carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date,reason:reason||''};
     if (req.file) data.imageUrl=`/uploads/${project_code.trim().toUpperCase()}/${req.file.filename}`;
     const log=await ActivityLog.create(data);
     const io=req.app.get('io'); if(io) io.emit('newAttendance',{name,project_code,date,time_in});
@@ -59,12 +60,13 @@ router.post('/', upload.single('image'), async (req,res) => {
 });
 
 router.post('/manual', verifyToken, async (req,res) => {
-  const {project_id,name,trade,car_reg,user_type,time_in,time_out,date}=req.body;
+  const {project_id,name,trade,car_reg,user_type,employee_company_name,time_in,time_out,date}=req.body;
   if (!project_id||!name||!time_in||!date) return res.status(400).json({error:'Missing required fields'});
   let hours=0;
   if (time_out){ const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`); hours=parseFloat(((ms<0?ms+86400000:ms||86400000)/3600000).toFixed(2)); }
   try {
-    await ActivityLog.create({siteId:project_id,name,trade:trade||'',carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date});
+    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    await ActivityLog.create({siteId:project_id,name,trade:trade||'',employeeCompanyName:empCompany,carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date});
     res.json({success:true,message:'Log created manually'});
   } catch(err){ res.status(500).json({error:'Server error'}); }
 });
@@ -113,11 +115,12 @@ router.get('/project/:id', verifyToken, async (req,res) => {
 });
 
 router.put('/:id', verifyToken, async (req,res) => {
-  const {name,trade,car_reg,user_type,time_in,time_out,reason,date}=req.body;
+  const {name,trade,car_reg,user_type,employee_company_name,time_in,time_out,reason,date}=req.body;
   try {
     const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`);
     const hours=parseFloat(((ms<0?ms+86400000:ms||86400000)/3600000).toFixed(2));
-    await ActivityLog.findByIdAndUpdate(req.params.id,{name,trade,carReg:car_reg,userType:user_type,timeIn:time_in,timeOut:time_out,hours,reason,date});
+    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    await ActivityLog.findByIdAndUpdate(req.params.id,{name,trade,employeeCompanyName:empCompany,carReg:car_reg,userType:user_type,timeIn:time_in,timeOut:time_out,hours,reason,date});
     res.json({success:true,message:'Log updated'});
   } catch(err){ res.status(500).json({error:'Server error'}); }
 });

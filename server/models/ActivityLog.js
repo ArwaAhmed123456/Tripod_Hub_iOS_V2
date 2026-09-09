@@ -6,6 +6,7 @@ const activityLogSchema = new mongoose.Schema({
   name:      { type: String },
   userType:  { type: String, default: 'Visitor' },
   trade:     { type: String, default: '' },
+  employeeCompanyName: { type: String, default: null },
   carReg:    { type: String, default: '' },
   reason:    { type: String, default: '' },
   imageUrl:  { type: String },

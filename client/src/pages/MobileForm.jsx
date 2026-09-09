@@ -31,6 +31,7 @@ const MobileForm = () => {
     // Details form
     const [name, setName] = useState('');
     const [company, setCompany] = useState('');
+    const [employeeCompanyName, setEmployeeCompanyName] = useState('');
     const [visiting, setVisiting] = useState('');
     const [visitingOpen, setVisitingOpen] = useState(false);
     const [members, setMembers] = useState([]);
@@ -163,6 +164,9 @@ const MobileForm = () => {
             formData.append('trade', company.trim() || '');
             formData.append('car_reg', carReg.trim() || '');
             formData.append('user_type', selectedGroup?.name || 'Visitor');
+            if (selectedGroup?.name?.toLowerCase().includes('employee') && employeeCompanyName.trim()) {
+                formData.append('employee_company_name', employeeCompanyName.trim());
+            }
             formData.append('date', today);
             formData.append('time_in', timeStr);
             if (visiting) formData.append('reason', `Visiting: ${visiting}`);
@@ -249,7 +253,13 @@ const MobileForm = () => {
                     {displayGroups.map(g => (
                         <button
                             key={g.id || g.name}
-                            onClick={() => { setSelectedGroup(g); setStep('details'); }}
+                            onClick={() => {
+                                setSelectedGroup(g);
+                                if (!g.name?.toLowerCase().includes('employee')) {
+                                    setEmployeeCompanyName('');
+                                }
+                                setStep('details');
+                            }}
                             className="w-full py-4 rounded-xl border border-slate-200 text-slate-700 text-base font-medium shadow-sm hover:border-slate-400 transition-colors bg-white"
                         >
                             {g.name}
@@ -265,6 +275,7 @@ const MobileForm = () => {
     // ════════════════════════════════════════════════════════════════
     if (step === 'details') {
         const isVisitor = selectedGroup?.name?.toLowerCase().includes('visitor');
+        const isEmployee = selectedGroup?.name?.toLowerCase().includes('employee');
 
         return (
             <div className="min-h-screen bg-white flex flex-col">
@@ -311,6 +322,22 @@ const MobileForm = () => {
                             className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
                         />
                     </div>
+
+                    {/* Employee Company Name */}
+                    {isEmployee && (
+                        <div className="flex flex-col gap-1">
+                            <label className="text-sm font-medium text-slate-700">
+                                Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                            </label>
+                            <input
+                                type="text"
+                                value={employeeCompanyName}
+                                onChange={e => setEmployeeCompanyName(e.target.value)}
+                                placeholder="Enter employee company name"
+                                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            />
+                        </div>
+                    )}
 
                     {/* Visiting — dropdown for visitors, plain text for others */}
                     {isVisitor && (

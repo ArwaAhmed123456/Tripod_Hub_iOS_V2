@@ -56,6 +56,7 @@ const PublicVisitorCheckIn = () => {
   // Form fields
   const [name, setName]       = useState('');
   const [company, setCompany] = useState('');
+  const [employeeCompanyName, setEmployeeCompanyName] = useState('');
   const [visiting, setVisiting] = useState('');
   const [carReg, setCarReg]   = useState('');
   const [nameError, setNameError] = useState('');
@@ -254,14 +255,16 @@ const PublicVisitorCheckIn = () => {
     setSubmitting(true);
     setSubmitError('');
     try {
+      const isEmp = selectedGroup?.name?.toLowerCase().includes('employee');
       const res = await publicApi.post('/visits/public', {
-        site_id:      siteId,
-        name:         name.trim(),
-        group:        selectedGroup?.name || 'Visitor',
-        trade:        company.trim()  || undefined,
-        car_reg:      carReg.trim()   || undefined,
-        reason:       visiting.trim() || undefined,
-        photo_base64: photoDataUrl    || undefined,  // send captured photo
+        site_id:               siteId,
+        name:                  name.trim(),
+        group:                 selectedGroup?.name || 'Visitor',
+        trade:                 company.trim()  || undefined,
+        employee_company_name: (isEmp && employeeCompanyName.trim()) ? employeeCompanyName.trim() : undefined,
+        car_reg:               carReg.trim()   || undefined,
+        reason:                visiting.trim() || undefined,
+        photo_base64:          photoDataUrl    || undefined,  // send captured photo
       });
       setVisitId(res.data?.visit?.id || null);
       stopCamera();
@@ -349,7 +352,13 @@ const PublicVisitorCheckIn = () => {
           <p className="text-sm text-slate-500 mb-8">Please choose a group to sign in to:</p>
           <div className="space-y-3">
             {groups.map(g => (
-              <button key={g.id} onClick={() => { setSelectedGroup(g); goToStep('details'); }}
+              <button key={g.id} onClick={() => {
+                setSelectedGroup(g);
+                if (!g.name?.toLowerCase().includes('employee')) {
+                  setEmployeeCompanyName('');
+                }
+                goToStep('details');
+              }}
                 className="w-full text-left px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-medium text-base hover:border-slate-400 active:bg-slate-50 transition-colors shadow-sm">
                 {g.name}
               </button>
@@ -389,6 +398,20 @@ const PublicVisitorCheckIn = () => {
                 {company && <button onClick={() => setCompany('')} className="ml-2 text-slate-400"><X size={16} /></button>}
               </div>
             </div>
+
+            {/* Employee Company Name */}
+            {selectedGroup?.name?.toLowerCase().includes('employee') && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                </label>
+                <div className="flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white">
+                  <input value={employeeCompanyName} onChange={e => setEmployeeCompanyName(e.target.value)}
+                    placeholder="Enter employee company name" className="flex-1 text-base text-slate-900 outline-none bg-transparent" />
+                  {employeeCompanyName && <button onClick={() => setEmployeeCompanyName('')} className="ml-2 text-slate-400"><X size={16} /></button>}
+                </div>
+              </div>
+            )}
 
             {/* Visiting */}
             <div>

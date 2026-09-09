@@ -1,6 +1,9 @@
 const express  = require('express');
 const router   = express.Router();
 const jwt      = require('jsonwebtoken');
+const multer   = require('multer');
+const path     = require('path');
+const fs       = require('fs');
 const Site     = require('../models/Site');
 const Member   = require('../models/Member');
 const Delivery = require('../models/Delivery');
@@ -14,7 +17,25 @@ const verifyToken = (req, res, next) => {
   catch { res.status(401).json({ error: 'Unauthorized' }); }
 };
 
-// Fuzzy matching helpers (kept from original)
+// ── Multer: store delivery pictures in uploads/deliveries/ ────────────────────
+const deliveryStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const dir = path.join(__dirname, '..', 'uploads', 'deliveries');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => cb(null, `${Date.now()}${path.extname(file.originalname)}`),
+});
+const uploadDeliveryImage = multer({
+  storage: deliveryStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max (client pre-compresses to ~1MB)
+  fileFilter: (req, file, cb) => {
+    if (!file.mimetype.startsWith('image/')) return cb(new Error('Only image files are allowed'));
+    cb(null, true);
+  },
+}).single('delivery_image');
+
+// Fuzzy matching helpers
 function levenshtein(a, b) {
   const m = []; for (let i=0;i<=b.length;i++) m[i]=[i]; for (let j=0;j<=a.length;j++) m[0][j]=j;
   for (let i=1;i<=b.length;i++) for (let j=1;j<=a.length;j++)
@@ -34,7 +55,7 @@ function matchScore(text, q) {
   return total/qs.length;
 }
 
-// ── GET /api/deliveries?site_id=xxx ─────────────────────────────────
+// ── GET /api/deliveries?site_id=xxx ─────────────────────────────────────────
 router.get('/', verifyToken, async (req, res) => {
   try {
     const { site_id, date_from, date_to, search } = req.query;
@@ -58,31 +79,44 @@ router.get('/', verifyToken, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// ── POST /api/deliveries ─────────────────────────────────────────────
-router.post('/', verifyToken, async (req, res) => {
-  const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at } = req.body;
-  if (!recipient && !item_name) return res.status(400).json({ error: 'item_name is required' });
-  try {
-    let siteId = site_id;
-    if (!siteId) {
-      const s = await Site.findOne().sort({ createdAt: 1 }).lean();
-      siteId = s?._id;
-    }
-    if (!siteId) return res.status(400).json({ error: 'No site found' });
-    const receivedAt = received_at ? new Date(received_at) : new Date();
-    if (Number.isNaN(receivedAt.getTime())) return res.status(400).json({ error: 'Invalid delivery date or time' });
-    const delivery = await Delivery.create({
-      siteId,
-      recipient: recipient || item_name,
-      sender: sender || '', carrier: carrier || '', notes: notes || description || '',
-      itemName: item_name || '', description: description || '',
-      carRegistration: car_registration || '', company: company || '', receivedAt,
-    });
-    res.status(201).json({ success: true, delivery });
-  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+// ── POST /api/deliveries ─────────────────────────────────────────────────────
+// Accepts multipart/form-data (with optional delivery_image) OR JSON (no image)
+router.post('/', verifyToken, (req, res) => {
+  uploadDeliveryImage(req, res, async (uploadErr) => {
+    if (uploadErr) return res.status(400).json({ error: uploadErr.message });
+
+    const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at } = req.body;
+    if (!recipient && !item_name) return res.status(400).json({ error: 'item_name is required' });
+
+    try {
+      let siteId = site_id;
+      if (!siteId) {
+        const s = await Site.findOne().sort({ createdAt: 1 }).lean();
+        siteId = s?._id;
+      }
+      if (!siteId) return res.status(400).json({ error: 'No site found' });
+
+      const receivedAt = received_at ? new Date(received_at) : new Date();
+      if (Number.isNaN(receivedAt.getTime())) return res.status(400).json({ error: 'Invalid delivery date or time' });
+
+      // Build image URL if a file was uploaded
+      const deliveryImageUrl = req.file ? `/uploads/deliveries/${req.file.filename}` : null;
+
+      const delivery = await Delivery.create({
+        siteId,
+        recipient: recipient || item_name,
+        sender: sender || '', carrier: carrier || '', notes: notes || description || '',
+        itemName: item_name || '', description: description || '',
+        carRegistration: car_registration || '', company: company || '', receivedAt,
+        deliveryImageUrl,
+      });
+
+      res.status(201).json({ success: true, delivery });
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
+  });
 });
 
-// ── POST /api/deliveries/:id/collect ────────────────────────────────
+// ── POST /api/deliveries/:id/collect ────────────────────────────────────────
 router.post('/:id/collect', verifyToken, async (req, res) => {
   try {
     const delivery = await Delivery.findByIdAndUpdate(
@@ -95,15 +129,21 @@ router.post('/:id/collect', verifyToken, async (req, res) => {
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
-// ── DELETE /api/deliveries/:id ───────────────────────────────────────
+// ── DELETE /api/deliveries/:id ───────────────────────────────────────────────
 router.delete('/:id', verifyToken, async (req, res) => {
   try {
+    const delivery = await Delivery.findById(req.params.id).lean();
+    // Remove associated image file if it exists
+    if (delivery?.deliveryImageUrl) {
+      const filePath = path.join(__dirname, '..', delivery.deliveryImageUrl.replace(/^\//, ''));
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    }
     await Delivery.findByIdAndDelete(req.params.id);
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// ── POST /api/deliveries/ocr-match ──────────────────────────────────
+// ── POST /api/deliveries/ocr-match ──────────────────────────────────────────
 router.post('/ocr-match', async (req, res) => {
   const { raw_text, project_code } = req.body;
   if (!raw_text || !project_code) return res.status(400).json({ error: 'raw_text and project_code required' });

@@ -38,6 +38,7 @@ const MobileForm = ({ navigation }) => {
         trade: '',
         car_reg: '',
         user_type: 'Employee',
+        employee_company_name: '',
         date: new Date().toISOString().split('T')[0],
         time_in: '',
         time_out: '',
@@ -191,6 +192,9 @@ const MobileForm = ({ navigation }) => {
             data.append('trade', formData.trade.trim());
             data.append('car_reg', formData.car_reg.trim());
             data.append('user_type', formData.user_type);
+            if (formData.user_type === 'Employee' && formData.employee_company_name?.trim()) {
+                data.append('employee_company_name', formData.employee_company_name.trim());
+            }
             data.append('date', formData.date);
             data.append('time_in', formData.time_in);
             data.append('reason', formData.reason || '');
@@ -356,13 +360,30 @@ const MobileForm = ({ navigation }) => {
                                 <StyledText className={`font-bold ${formData.user_type === 'Employee' ? 'text-primary' : 'text-slate-400'}`}>Employee</StyledText>
                             </StyledTouchableOpacity>
                             <StyledTouchableOpacity
-                                onPress={() => setFormData({ ...formData, user_type: 'Visitor' })}
+                                onPress={() => setFormData({ ...formData, user_type: 'Visitor', employee_company_name: '' })}
                                 className={`flex-1 py-3 rounded-2xl border-2 items-center justify-center transition-all ${formData.user_type === 'Visitor' ? 'bg-primary/10 border-primary' : 'bg-slate-50 border-slate-200'}`}
                             >
                                 <StyledText className={`font-bold ${formData.user_type === 'Visitor' ? 'text-primary' : 'text-slate-400'}`}>Visitor</StyledText>
                             </StyledTouchableOpacity>
                         </StyledView>
                     </StyledView>
+
+                    {formData.user_type === 'Employee' && (
+                        <StyledView className="mb-4">
+                            <StyledText className="text-sm font-medium text-slate-700 mb-1">
+                                Employee Company Name <StyledText className="text-slate-400 font-normal italic text-xs">(Optional)</StyledText>
+                            </StyledText>
+                            <StyledView className="flex-row items-center bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 focus:border-primary">
+                                <Briefcase size={18} color="#94a3b8" />
+                                <StyledTextInput
+                                    className="flex-1 ml-3 text-slate-900 font-medium"
+                                    placeholder="Enter employee company name"
+                                    value={formData.employee_company_name || ''}
+                                    onChangeText={(text) => setFormData({ ...formData, employee_company_name: text })}
+                                />
+                            </StyledView>
+                        </StyledView>
+                    )}
 
                     <StyledView>
                         <StyledText className="text-sm font-medium text-slate-700 mb-1">

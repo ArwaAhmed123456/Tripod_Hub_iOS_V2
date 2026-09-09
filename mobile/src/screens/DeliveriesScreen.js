@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
   Modal,
   Platform,
   RefreshControl,
@@ -47,6 +48,9 @@ export default function DeliveriesScreen({ navigation, route }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const siteId = route?.params?.siteId || user?.project_id || user?.site_id;
+
+  // Derive server root URL for building image URLs in PDF (strip trailing /api)
+  const SERVER_BASE = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com';
 
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -99,16 +103,15 @@ export default function DeliveriesScreen({ navigation, route }) {
     }
     setExporting(true);
     try {
+      // ── Bug fix: Report columns match ONLY the mobile DeliveryFormScreen fields ──
+      // Removed: Recipient, Sender, Carrier (web-portal-only fields, not in this form)
       const rows = reportItems
         .map(
           (d) => `<tr>
-            <td>${esc(d.itemName || d.recipient)}</td>
-            <td>${esc(d.recipient)}</td>
-            <td>${esc(d.company)}</td>
-            <td>${esc(d.description || d.notes)}</td>
-            <td>${esc(d.carRegistration || d.car_registration)}</td>
-            <td>${esc(d.sender)}</td>
-            <td>${esc(d.carrier)}</td>
+            <td>${esc(d.itemName || d.item_name || '—')}</td>
+            <td>${esc(d.company || '—')}</td>
+            <td>${esc(d.description || d.notes || '—')}</td>
+            <td>${esc(d.carRegistration || d.car_registration || '—')}</td>
             <td>${esc(formatDate(d.receivedAt || d.createdAt))}</td>
             <td>${d.collected ? 'Collected' : 'Pending collection'}</td>
             <td>${d.collected ? esc(formatDate(d.collectedAt)) : '—'}</td>
@@ -116,17 +119,27 @@ export default function DeliveriesScreen({ navigation, route }) {
         )
         .join('');
 
+      // Delivery picture section — only rendered for single-delivery reports with an image
+      const singleDelivery = reportItems.length === 1 ? reportItems[0] : null;
+      const imageSection = singleDelivery?.deliveryImageUrl
+        ? `<div style="margin-top:28px">
+            <h3 style="font-size:14px;color:#374151;margin-bottom:10px">Delivery Picture</h3>
+            <img src="${SERVER_BASE}${singleDelivery.deliveryImageUrl}"
+              style="max-width:400px;max-height:300px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
+           </div>`
+        : '';
+
       const html = `<html><body style="font-family:Arial;padding:24px;color:#111827">
         <h2>${esc(reportTitle)}</h2>
         <p>Period: ${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}</p>
         <table style="width:100%;border-collapse:collapse" border="1" cellpadding="7">
           <thead><tr style="background:#f8fafc;font-weight:bold">
-            <th>Item</th><th>Recipient</th><th>Company</th><th>Description</th>
-            <th>Vehicle Reg.</th><th>Sender</th><th>Carrier</th>
-            <th>Received</th><th>Status</th><th>Collected At</th>
+            <th>Item Name</th><th>Company</th><th>Description</th>
+            <th>Vehicle Reg.</th><th>Received</th><th>Status</th><th>Collected At</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
+        ${imageSection}
       </body></html>`;
 
       if (format === 'pdf') {
@@ -134,7 +147,7 @@ export default function DeliveriesScreen({ navigation, route }) {
         await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Delivery report (PDF)' });
       } else {
         const file = new File(Paths.cache, 'delivery-report.xls');
-        file.write(html);
+        await file.writeAsStringAsync(html);
         await Sharing.shareAsync(file.uri, { mimeType: 'application/vnd.ms-excel', dialogTitle: 'Delivery report (Excel)' });
       }
     } catch (err) {
@@ -144,7 +157,7 @@ export default function DeliveriesScreen({ navigation, route }) {
     }
   };
 
-  // ── Delivery detail sheet ─────────────────────────────────────────────────
+  // ── Delivery detail sheet ───────────────────────────────────────────────
   const renderDetail = (d) => (
     <Modal visible={!!d} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
       <View style={s.overlay}>
@@ -161,12 +174,11 @@ export default function DeliveriesScreen({ navigation, route }) {
           <Text style={s.status}>{d?.collected ? '✓ Collected' : '⏳ Pending collection'}</Text>
 
           {[
-            ['Recipient',       d?.recipient],
+            // ── Only fields that match the mobile DeliveryFormScreen form ──
+            ['Item Name',       d?.itemName],
             ['Company',         d?.company],
             ['Description',     d?.description || d?.notes],
-            ['Sender',          d?.sender],
-            ['Carrier',         d?.carrier],
-            ['Car Registration',d?.carRegistration || d?.car_registration],
+            ['Car Registration', d?.carRegistration || d?.car_registration],
             ['Received',        formatDate(d?.receivedAt || d?.createdAt)],
             ['Collected At',    d?.collected ? formatDate(d?.collectedAt) : 'Not yet collected'],
           ].map(([label, value]) => (
@@ -175,6 +187,18 @@ export default function DeliveriesScreen({ navigation, route }) {
               <Text style={s.detailValue}>{value || '—'}</Text>
             </View>
           ))}
+
+          {/* Delivery Picture — only shown when an image was captured */}
+          {d?.deliveryImageUrl ? (
+            <View style={s.detailImageSection}>
+              <Text style={s.detailLabel}>Delivery Picture</Text>
+              <Image
+                source={{ uri: `${SERVER_BASE}${d.deliveryImageUrl}` }}
+                style={s.detailImage}
+                resizeMode="cover"
+              />
+            </View>
+          ) : null}
 
           <TouchableOpacity
             style={s.detailExport}
@@ -386,6 +410,8 @@ const s = StyleSheet.create({
   detailRow:    { paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f1f5f9' },
   detailLabel:  { fontSize: 11, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   detailValue:  { fontSize: 15, color: '#111827', marginTop: 2 },
+  detailImageSection: { marginTop: 14, marginBottom: 4 },
+  detailImage:  { width: '100%', height: 200, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
   detailExport: { backgroundColor: '#2b4594', borderRadius: 12, padding: 14, marginTop: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   buttonText:   { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

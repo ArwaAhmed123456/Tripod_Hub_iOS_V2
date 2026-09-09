@@ -92,6 +92,7 @@ app.use('/api/pre-registrations', preRegistrationsRoutes);
 app.use('/api/evacuation', evacuationRoutes);
 app.use('/api/posters', require('./routes/posters'));
 app.use('/api/messages', require('./routes/messages'));
+app.use('/api/cameras', require('./routes/cameras'));
 
 // Health check — always responds regardless of DB state
 app.get('/api/health', (req, res) => {
