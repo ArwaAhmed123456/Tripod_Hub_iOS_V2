@@ -12,6 +12,7 @@
   "dependencies": {
     "axios": "^1.13.4",
     "date-fns": "^4.1.0",
+    "hls.js": "^1.7.2",
     "jspdf": "^4.0.0",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",

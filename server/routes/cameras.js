@@ -12,7 +12,9 @@ const ptzService = require('../services/ptzService');
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_123';
 
 /**
- * Middleware: Verify that the caller is an authenticated Manager, Admin, or Superadmin.
+ * Middleware: resolve the current account on every request.  The database is the
+ * source of truth, which means Super Admin permission changes are immediate and
+ * do not require a new login token.
  */
 const verifyManagerOrAdmin = async (req, res, next) => {
     const auth = req.headers['authorization'];
@@ -20,10 +22,26 @@ const verifyManagerOrAdmin = async (req, res, next) => {
 
     try {
         const decoded = jwt.verify(auth.split(' ')[1], JWT_SECRET);
-        const role = String(decoded.role || decoded.mobileRole || '').toLowerCase();
-
-        if (!['manager', 'admin', 'superadmin', 'guard'].includes(role)) {
-            return res.status(403).json({ error: 'Access denied: Manager or Admin role required' });
+        let record = await Admin.findById(decoded.id || decoded.userId || decoded._id).lean();
+        let accountType = 'admin';
+        if (!record) {
+            record = await Member.findById(decoded.id || decoded.userId || decoded._id).lean();
+            accountType = 'member';
+        }
+        if (!record || (record.is_active === false || record.isActive === false)) {
+            return res.status(403).json({ error: 'Account is inactive or no longer exists' });
+        }
+        const role = String(accountType === 'admin' ? record.role : (record.mobileRole || record.role) || '').toLowerCase();
+        const permissions = accountType === 'admin' ? record.granular_permissions : record.granularPermissions;
+        const cameraOverride = accountType === 'admin'
+            ? permissions?.camera_access_override
+            : permissions?.cameraAccessOverride;
+        const normalCameraRole = ['manager', 'admin', 'superadmin'].includes(role);
+        if (!normalCameraRole && cameraOverride !== true) {
+            return res.status(403).json({ error: 'Access denied: camera permission required' });
+        }
+        if (cameraOverride === false && role !== 'superadmin') {
+            return res.status(403).json({ error: 'Access denied: camera permission has been revoked' });
         }
 
         req.user = {
@@ -31,6 +49,8 @@ const verifyManagerOrAdmin = async (req, res, next) => {
             email: decoded.email,
             role,
             siteId: decoded.siteId || decoded.site_id || decoded.projectId,
+            accountType,
+            record,
         };
 
         next();
@@ -44,7 +64,7 @@ const verifyManagerOrAdmin = async (req, res, next) => {
  */
 const checkSiteAccess = async (user, siteId) => {
     const role = (user.role || '').toLowerCase();
-    if (role === 'superadmin' || role === 'admin') return true;
+    if (role === 'superadmin') return true;
 
     const perms = await getUserPermissions(user);
     if (!perms) return false;
@@ -64,9 +84,9 @@ const getUserPermissions = async (user) => {
     let record = await Admin.findById(user.id).lean();
     if (record) {
         return {
-            allowedSites: record.granular_permissions?.allowed_sites?.map(String) || [],
+            allowedSites: record.granular_permissions?.allowed_sites?.map(String) || (record.site_id ? [String(record.site_id)] : []),
             allowedCameras: record.granular_permissions?.allowed_cameras?.map(String) || [],
-            canViewCameras: record.granular_permissions?.module_permissions?.can_view_cameras !== false,
+            canViewCameras: record.granular_permissions?.camera_access_override !== false,
         };
     }
 
@@ -75,11 +95,26 @@ const getUserPermissions = async (user) => {
         return {
             allowedSites: record.granularPermissions?.allowedSites?.map(String) || (record.siteId ? [String(record.siteId)] : []),
             allowedCameras: record.granularPermissions?.allowedCameras?.map(String) || [],
-            canViewCameras: record.granularPermissions?.modulePermissions?.can_view_cameras !== false,
+            canViewCameras: record.granularPermissions?.cameraAccessOverride !== false,
         };
     }
 
     return null;
+};
+
+// Used by the header to show the Cameras menu only to users who can actually
+// use it. This deliberately resolves the account from the database each time.
+router.get('/access', verifyManagerOrAdmin, async (req, res) => {
+    const permissions = await getUserPermissions(req.user);
+    res.json({ can_view_cameras: Boolean(permissions?.isSuperAdmin || permissions?.canViewCameras !== false) });
+});
+
+const canManageCameras = async (user) => {
+    if (user.role === 'superadmin' || user.role === 'admin') return true;
+    const perms = user.accountType === 'admin'
+        ? user.record.granular_permissions
+        : user.record.granularPermissions;
+    return perms?.module_permissions?.can_manage_cameras === true || perms?.modulePermissions?.can_manage_cameras === true;
 };
 
 const checkCameraAccess = async (user, camera) => {
@@ -195,6 +230,8 @@ router.post('/', verifyManagerOrAdmin, async (req, res) => {
     }
 
     try {
+        if (!(await canManageCameras(req.user))) return res.status(403).json({ error: 'Access denied: manage camera permission required' });
+        if (!(await checkSiteAccess(req.user, site_id))) return res.status(403).json({ error: 'Access denied: You are not assigned to this site' });
         const site = await Site.findById(site_id).lean();
         if (!site) return res.status(404).json({ error: 'Site not found' });
 
@@ -233,6 +270,10 @@ router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
     const { name, location, rtsp_url, sub_stream_rtsp_url, status, ptz_supported, order, onvif_url, onvif_host } = req.body;
 
     try {
+        if (!(await canManageCameras(req.user))) return res.status(403).json({ error: 'Access denied: manage camera permission required' });
+        const existing = await Camera.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Camera not found' });
+        if (!(await checkCameraAccess(req.user, existing))) return res.status(403).json({ error: 'Access denied: You are not assigned to this camera' });
         const updates = {};
         if (name !== undefined) updates.name = name.trim();
         if (location !== undefined) updates.location = location.trim();
@@ -261,6 +302,10 @@ router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
 // ─── DELETE /api/cameras/:id (Admin only) ─────────────────────────────────────
 router.delete('/:id', verifyManagerOrAdmin, async (req, res) => {
     try {
+        if (!(await canManageCameras(req.user))) return res.status(403).json({ error: 'Access denied: manage camera permission required' });
+        const existing = await Camera.findById(req.params.id);
+        if (!existing) return res.status(404).json({ error: 'Camera not found' });
+        if (!(await checkCameraAccess(req.user, existing))) return res.status(403).json({ error: 'Access denied: You are not assigned to this camera' });
         const camera = await Camera.findByIdAndDelete(req.params.id);
         if (!camera) return res.status(404).json({ error: 'Camera not found' });
         res.json({ success: true, message: 'Camera removed' });

@@ -33413,7 +33413,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-CUjIzxfr.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-OXfQP2d0.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -66585,6 +66585,7 @@ const AdminLayout = () => {
   const [manageOpen, setManageOpen] = reactExports.useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = reactExports.useState(false);
   const [pendingCount, setPendingCount] = reactExports.useState(0);
+  const [canViewCameras, setCanViewCameras] = reactExports.useState(false);
   const desktopProfileRef = reactExports.useRef(null);
   const mobileProfileRef = reactExports.useRef(null);
   const supportRef = reactExports.useRef(null);
@@ -66610,6 +66611,21 @@ const AdminLayout = () => {
     const interval = setInterval(fetchPending, 3e4);
     return () => clearInterval(interval);
   }, []);
+  reactExports.useEffect(() => {
+    const loadCameraAccess = async () => {
+      try {
+        const { default: api2 } = await __vitePreload(async () => {
+          const { default: api3 } = await Promise.resolve().then(() => index);
+          return { default: api3 };
+        }, true ? void 0 : void 0);
+        const res = await api2.get("/cameras/access");
+        setCanViewCameras(res.data?.can_view_cameras === true);
+      } catch {
+        setCanViewCameras(false);
+      }
+    };
+    loadCameraAccess();
+  }, [location2.pathname]);
   const firstName = localStorage.getItem("adminFirstName") || "";
   const lastName = localStorage.getItem("adminLastName") || "";
   const adminEmail = localStorage.getItem("admin_remember_email") || "";
@@ -66635,7 +66651,7 @@ const AdminLayout = () => {
   }, []);
   const navLinks = [
     { to: "/admin/activity", label: "Activity" },
-    { to: "/admin/cameras", label: "CCTV Cameras" },
+    ...canViewCameras ? [{ to: "/admin/cameras", label: "Cameras" }] : [],
     { to: "/admin/people", label: "People" },
     { to: "/admin/attendance", label: "Attendance" },
     ...adminRole === "superadmin" ? [{ to: "/admin/superadmin", label: "Super Admin" }] : []
@@ -67087,6 +67103,7 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 };
 const VISIT_EXPORT_FIELDS = [
   { id: "Name", value: (visit) => visit.name || "" },
+  { id: "Company", value: (visit) => visit.company || "" },
   { id: "Site", value: (visit) => visit.site || "" },
   { id: "Group", value: (visit) => visit.group || "" },
   { id: "In time", value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -67102,7 +67119,8 @@ const VISIT_EXPORT_FIELDS = [
   { id: "Modified reason", value: (visit) => visit.reason || "" },
   { id: "Rejected sign in", value: () => "No" },
   { id: "Locale", value: () => "en-GB" },
-  { id: "Visit notes", value: (visit) => visit.reason || "" }
+  { id: "Visit notes", value: (visit) => visit.reason || "" },
+  { id: "Photo", value: (visit) => visit.photo_base64 || visit.photo ? "Included" : "" }
 ];
 const TAB_ITEMS = [
   { id: "visits", label: "Visit timeline" },
@@ -68345,23 +68363,37 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [expandedId, setExpandedId] = reactExports.useState(null);
   const [showExportModal, setShowExportModal] = reactExports.useState(false);
   const [includeExportPhotos, setIncludeExportPhotos] = reactExports.useState(true);
+  const [deliveryExportColumns, setDeliveryExportColumns] = reactExports.useState([
+    "Item / Recipient",
+    "Sender / Company",
+    "Carrier / Reg",
+    "Received",
+    "Status",
+    "Photo"
+  ]);
   const fileInputRef = React.useRef(null);
   const API_BASE = "";
   const handlePrintReport = () => {
+    if (!deliveryExportColumns.length) {
+      zt$1.error("Select at least one column to export");
+      return;
+    }
     setShowExportModal(false);
     const printWin = window.open("", "_blank");
     if (!printWin) return;
-    const rowsHtml = filtered.map((d2) => `
-      <tr>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d2.recipient || d2.itemName || "—"}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d2.sender || d2.company || "—"}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d2.carrier || d2.carRegistration || "—"}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB") : "—"}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d2.collected ? "Collected" : "Pending"}</td>
-      </tr>
-    `).join("");
+    const deliveryFields = {
+      "Item / Recipient": (d2) => d2.recipient || d2.itemName || "—",
+      "Sender / Company": (d2) => d2.sender || d2.company || "—",
+      "Carrier / Reg": (d2) => d2.carrier || d2.carRegistration || "—",
+      Received: (d2) => d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB") : "—",
+      Status: (d2) => d2.collected ? "Collected" : "Pending"
+    };
+    const tableColumns = deliveryExportColumns.filter((c2) => c2 !== "Photo");
+    const rowsHtml = filtered.map((d2) => `<tr>${tableColumns.map(
+      (c2) => `<td style="padding:8px;border:1px solid #e2e8f0;">${deliveryFields[c2](d2)}</td>`
+    ).join("")}</tr>`).join("");
     let picsHtml = "";
-    if (includeExportPhotos) {
+    if (includeExportPhotos && deliveryExportColumns.includes("Photo")) {
       const withPics = filtered.filter((d2) => d2.deliveryImageUrl);
       if (withPics.length > 0) {
         picsHtml = `
@@ -68391,11 +68423,7 @@ const DeliveriesTab = ({ siteId, siteName }) => {
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
             <thead>
               <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
-                <th style="padding:8px;border:1px solid #e2e8f0;">Item / Recipient</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Sender / Company</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Carrier / Reg</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Received</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Status</th>
+                ${tableColumns.map((c2) => `<th style="padding:8px;border:1px solid #e2e8f0;">${c2}</th>`).join("")}
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
@@ -68406,6 +68434,21 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       </html>
     `);
     printWin.document.close();
+  };
+  const handleDeliveryExcelExport = () => {
+    if (!deliveryExportColumns.length) return zt$1.error("Select at least one column to export");
+    const values = {
+      "Item / Recipient": (d2) => d2.recipient || d2.itemName || "",
+      "Sender / Company": (d2) => d2.sender || d2.company || "",
+      "Carrier / Reg": (d2) => d2.carrier || d2.carRegistration || "",
+      Received: (d2) => d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB") : "",
+      Status: (d2) => d2.collected ? "Collected" : "Pending",
+      Photo: (d2) => d2.deliveryImageUrl ? "Included" : ""
+    };
+    const rows = filtered.map((delivery) => Object.fromEntries(deliveryExportColumns.map((column) => [column, values[column](delivery)])));
+    downloadWorkbook(rows, `${(siteName || "site").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-deliveries-export.xlsx`, "Deliveries");
+    zt$1.success(`Exported ${rows.length} delivery record${rows.length === 1 ? "" : "s"}`);
+    setShowExportModal(false);
   };
   reactExports.useEffect(() => {
     if (siteId) fetchDeliveries();
@@ -68758,6 +68801,16 @@ const DeliveriesTab = ({ siteId, siteName }) => {
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500", children: "Uncheck to generate a clean table-only report" })
         ] })
       ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-slate-800", children: "Columns to include" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: () => setDeliveryExportColumns(["Item / Recipient", "Sender / Company", "Carrier / Reg", "Received", "Status", "Photo"]), className: "text-xs font-semibold text-[#2b4594] hover:underline", children: "Select all" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: ["Item / Recipient", "Sender / Company", "Carrier / Reg", "Received", "Status", "Photo"].map((column) => /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center gap-2 text-sm text-slate-700", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "checkbox", checked: deliveryExportColumns.includes(column), onChange: () => setDeliveryExportColumns((current) => current.includes(column) ? current.filter((c2) => c2 !== column) : [...current, column]), className: "w-4 h-4 accent-[#2b4594]" }),
+          column
+        ] }, column)) })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-end gap-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx(
           "button",
@@ -68777,6 +68830,18 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 15 }),
               " Print / Export PDF"
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "button",
+          {
+            type: "button",
+            onClick: handleDeliveryExcelExport,
+            className: "inline-flex items-center gap-2 rounded-lg border border-[#2b4594] px-4 py-2 text-sm font-semibold text-[#2b4594] hover:bg-blue-50",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Download, { size: 15 }),
+              " Export Excel"
             ]
           }
         )
@@ -117494,7 +117559,8 @@ const SuperAdminPage = () => {
       allowed_sites: (gp.allowed_sites || gp.allowedSites || []).map(String),
       allowed_cameras: (gp.allowed_cameras || gp.allowedCameras || []).map(String),
       module_permissions: {
-        can_view_cameras: gp.module_permissions?.can_view_cameras ?? gp.modulePermissions?.can_view_cameras ?? true,
+        // Until an override is saved, the normal policy is Manager/Admin only.
+        can_view_cameras: typeof (gp.camera_access_override ?? gp.cameraAccessOverride) === "boolean" ? gp.camera_access_override ?? gp.cameraAccessOverride : ["manager", "admin", "superadmin"].includes(acc.role),
         can_manage_cameras: gp.module_permissions?.can_manage_cameras ?? gp.modulePermissions?.can_manage_cameras ?? false,
         can_edit_reports: gp.module_permissions?.can_edit_reports ?? gp.modulePermissions?.can_edit_reports ?? false,
         can_delete_reports: gp.module_permissions?.can_delete_reports ?? gp.modulePermissions?.can_delete_reports ?? false,

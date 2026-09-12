@@ -21,6 +21,22 @@ const memberSchema = new mongoose.Schema({
   siteId:             { type: mongoose.Schema.Types.ObjectId, ref: 'Project' },
   siteName:           { type: String }, // cached site name for fast lookups
   visitorGroupId:     { type: mongoose.Schema.Types.ObjectId, ref: 'VisitorGroup' },
+  company:            { type: String, default: '' },
+  isActive:           { type: Boolean, default: true },
+  granularPermissions: {
+    // null = use the normal role policy; true/false = explicit Super Admin override
+    cameraAccessOverride: { type: Boolean, default: null },
+    allowedSites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Project' }],
+    allowedCameras: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Camera' }],
+    modulePermissions: {
+      can_view_cameras:   { type: Boolean, default: true },
+      can_manage_cameras: { type: Boolean, default: false },
+      can_edit_reports:   { type: Boolean, default: false },
+      can_delete_reports: { type: Boolean, default: false },
+      can_export_reports: { type: Boolean, default: true },
+      can_approve_guards: { type: Boolean, default: true },
+    }
+  },
   permissions:        { type: String },  // JSON string
   mobilePaired:       { type: Boolean, default: false },
   mobileDeviceId:     { type: String },

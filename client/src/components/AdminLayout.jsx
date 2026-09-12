@@ -14,6 +14,7 @@ const AdminLayout = () => {
   const [manageOpen,  setManageOpen]  = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [canViewCameras, setCanViewCameras] = useState(false);
   const desktopProfileRef = useRef(null);
   const mobileProfileRef  = useRef(null);
   const supportRef        = useRef(null);
@@ -38,6 +39,21 @@ const AdminLayout = () => {
     const interval = setInterval(fetchPending, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // The server decides visibility so explicit Super Admin grants/revocations
+  // take effect in the header without relying on a role stored at login.
+  useEffect(() => {
+    const loadCameraAccess = async () => {
+      try {
+        const { default: api } = await import('../api');
+        const res = await api.get('/cameras/access');
+        setCanViewCameras(res.data?.can_view_cameras === true);
+      } catch {
+        setCanViewCameras(false);
+      }
+    };
+    loadCameraAccess();
+  }, [location.pathname]);
 
   const firstName    = localStorage.getItem('adminFirstName') || '';
   const lastName     = localStorage.getItem('adminLastName')  || '';
@@ -71,7 +87,7 @@ const AdminLayout = () => {
 
   const navLinks = [
     { to: '/admin/activity',   label: 'Activity'   },
-    { to: '/admin/cameras',    label: 'CCTV Cameras' },
+    ...(canViewCameras ? [{ to: '/admin/cameras', label: 'Cameras' }] : []),
     { to: '/admin/people',     label: 'People'     },
     { to: '/admin/attendance', label: 'Attendance' },
     ...(adminRole === 'superadmin' ? [{ to: '/admin/superadmin', label: 'Super Admin' }] : []),

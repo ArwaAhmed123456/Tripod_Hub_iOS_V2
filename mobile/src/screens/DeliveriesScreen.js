@@ -8,6 +8,7 @@ import {
   Platform,
   RefreshControl,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -59,6 +60,10 @@ export default function DeliveriesScreen({ navigation, route }) {
   const [dateTo, setDateTo]     = useState(null);   // Date | null
   const [showPicker, setShowPicker] = useState(null); // 'from' | 'to' | null
   const [selected, setSelected] = useState(null);
+  const [detailIncludePhoto, setDetailIncludePhoto] = useState(true);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState('pdf');
+  const [exportIncludePhotos, setExportIncludePhotos] = useState(true);
   const [exporting, setExporting] = useState(false);
 
   // ── Data loading ──────────────────────────────────────────────────────────
@@ -97,14 +102,13 @@ export default function DeliveriesScreen({ navigation, route }) {
   const list = useMemo(() => deliveries, [deliveries]);
 
   // ── Export ────────────────────────────────────────────────────────────────
-  const exportReport = async (format, reportItems = list, reportTitle = 'Delivery Report') => {
+  const exportReport = async (format, reportItems = list, reportTitle = 'Delivery Report', includePhotos = true) => {
     if (!reportItems.length) {
       return Alert.alert('Nothing to export', 'No deliveries match the current filters.');
     }
     setExporting(true);
     try {
-      // ── Bug fix: Report columns match ONLY the mobile DeliveryFormScreen fields ──
-      // Removed: Recipient, Sender, Carrier (web-portal-only fields, not in this form)
+      // ── Report columns match ONLY the mobile DeliveryFormScreen fields ──
       const rows = reportItems
         .map(
           (d) => `<tr>
@@ -119,15 +123,31 @@ export default function DeliveriesScreen({ navigation, route }) {
         )
         .join('');
 
-      // Delivery picture section — only rendered for single-delivery reports with an image
+      // Delivery picture section — only rendered when includePhotos is TRUE and image exists
       const singleDelivery = reportItems.length === 1 ? reportItems[0] : null;
-      const imageSection = singleDelivery?.deliveryImageUrl
-        ? `<div style="margin-top:28px">
+      let imageSection = '';
+      if (includePhotos && singleDelivery?.deliveryImageUrl) {
+        imageSection = `<div style="margin-top:28px">
             <h3 style="font-size:14px;color:#374151;margin-bottom:10px">Delivery Picture</h3>
             <img src="${SERVER_BASE}${singleDelivery.deliveryImageUrl}"
               style="max-width:400px;max-height:300px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
-           </div>`
-        : '';
+           </div>`;
+      } else if (includePhotos && reportItems.length > 1) {
+        const deliveriesWithPics = reportItems.filter(d => d.deliveryImageUrl);
+        if (deliveriesWithPics.length > 0) {
+          imageSection = `<div style="margin-top:32px;page-break-before:always">
+            <h3 style="font-size:16px;color:#111827;margin-bottom:14px">Attached Delivery Pictures</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:16px">
+              ${deliveriesWithPics.map(d => `
+                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:280px">
+                  <div style="font-size:12px;font-weight:bold;margin-bottom:6px">${esc(d.itemName || d.item_name || 'Item')} — ${esc(d.company || '—')}</div>
+                  <img src="${SERVER_BASE}${d.deliveryImageUrl}" style="width:100%;height:180px;object-fit:cover;border-radius:6px" />
+                </div>
+              `).join('')}
+            </div>
+          </div>`;
+        }
+      }
 
       const html = `<html><body style="font-family:Arial;padding:24px;color:#111827">
         <h2>${esc(reportTitle)}</h2>
@@ -197,6 +217,15 @@ export default function DeliveriesScreen({ navigation, route }) {
                 style={s.detailImage}
                 resizeMode="cover"
               />
+              <View style={s.photoToggleRow}>
+                <Text style={s.photoToggleLabel}>Include picture in printable report</Text>
+                <Switch
+                  value={detailIncludePhoto}
+                  onValueChange={setDetailIncludePhoto}
+                  trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                  thumbColor={detailIncludePhoto ? '#2b4594' : '#f1f5f9'}
+                />
+              </View>
             </View>
           ) : null}
 
@@ -204,8 +233,8 @@ export default function DeliveriesScreen({ navigation, route }) {
             style={s.detailExport}
             onPress={() =>
               Alert.alert('Download this delivery', 'Choose a format', [
-                { text: 'PDF', onPress: () => exportReport('pdf', [d], 'Delivery Details') },
-                { text: 'Excel (.xls)', onPress: () => exportReport('excel', [d], 'Delivery Details') },
+                { text: 'PDF', onPress: () => exportReport('pdf', [d], 'Delivery Details', detailIncludePhoto) },
+                { text: 'Excel (.xls)', onPress: () => exportReport('excel', [d], 'Delivery Details', false) },
                 { text: 'Cancel', style: 'cancel' },
               ])
             }
@@ -292,13 +321,7 @@ export default function DeliveriesScreen({ navigation, route }) {
         {/* Download filtered report button */}
         <TouchableOpacity
           disabled={exporting}
-          onPress={() =>
-            Alert.alert('Download filtered report', 'Choose a format', [
-              { text: 'PDF', onPress: () => exportReport('pdf') },
-              { text: 'Excel (.xls)', onPress: () => exportReport('excel') },
-              { text: 'Cancel', style: 'cancel' },
-            ])
-          }
+          onPress={() => setShowExportModal(true)}
           style={s.reportBtn}
         >
           {exporting ? (
@@ -311,6 +334,58 @@ export default function DeliveriesScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Export Options Modal */}
+      <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
+        <View style={s.modalBackdrop}>
+          <View style={s.modalCard}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Export Delivery Report</Text>
+              <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                <X size={20} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#64748b' }}>Choose file format:</Text>
+            <View style={s.formatRow}>
+              <TouchableOpacity
+                style={[s.formatBtn, exportFormat === 'pdf' && s.formatBtnActive]}
+                onPress={() => setExportFormat('pdf')}
+              >
+                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>PDF Document</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.formatBtn, exportFormat === 'excel' && s.formatBtnActive]}
+                onPress={() => setExportFormat('excel')}
+              >
+                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>Excel (.xls)</Text>
+              </TouchableOpacity>
+            </View>
+
+            {exportFormat === 'pdf' && (
+              <View style={s.photoToggleRow}>
+                <Text style={s.photoToggleLabel}>Include delivery pictures</Text>
+                <Switch
+                  value={exportIncludePhotos}
+                  onValueChange={setExportIncludePhotos}
+                  trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
+                  thumbColor={exportIncludePhotos ? '#2b4594' : '#f1f5f9'}
+                />
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={s.confirmBtn}
+              onPress={() => {
+                setShowExportModal(false);
+                exportReport(exportFormat, list, 'Delivery Report', exportIncludePhotos);
+              }}
+            >
+              <Text style={s.confirmBtnText}>Download Report</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Native date picker (renders as dialog on Android, inline on iOS) */}
       {showPicker ? (
@@ -412,6 +487,19 @@ const s = StyleSheet.create({
   detailValue:  { fontSize: 15, color: '#111827', marginTop: 2 },
   detailImageSection: { marginTop: 14, marginBottom: 4 },
   detailImage:  { width: '100%', height: 200, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  photoToggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  photoToggleLabel: { fontSize: 13, fontWeight: '600', color: '#334155' },
   detailExport: { backgroundColor: '#2b4594', borderRadius: 12, padding: 14, marginTop: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   buttonText:   { color: '#fff', fontWeight: '800', fontSize: 15 },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalCard:    { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 22, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle:   { fontSize: 18, fontWeight: '800', color: '#111827' },
+  formatRow:    { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 16 },
+  formatBtn:    { flex: 1, paddingVertical: 11, borderWidth: 1.5, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center' },
+  formatBtnActive: { borderColor: '#2b4594', backgroundColor: '#eff6ff' },
+  formatBtnText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  formatBtnTextActive: { color: '#2b4594' },
+  confirmBtn:   { backgroundColor: '#2b4594', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 16 },
+  confirmBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });

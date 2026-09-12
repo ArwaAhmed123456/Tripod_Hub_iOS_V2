@@ -111,6 +111,7 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 
 const VISIT_EXPORT_FIELDS = [
   { id: 'Name', value: (visit) => visit.name || '' },
+  { id: 'Company', value: (visit) => visit.company || '' },
   { id: 'Site', value: (visit) => visit.site || '' },
   { id: 'Group', value: (visit) => visit.group || '' },
   { id: 'In time', value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -127,6 +128,7 @@ const VISIT_EXPORT_FIELDS = [
   { id: 'Rejected sign in', value: () => 'No' },
   { id: 'Locale', value: () => 'en-GB' },
   { id: 'Visit notes', value: (visit) => visit.reason || '' },
+  { id: 'Photo', value: (visit) => visit.photo_base64 || visit.photo ? 'Included' : '' },
 ];
 
 const TAB_ITEMS = [
@@ -1428,26 +1430,35 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [expandedId, setExpandedId] = useState(null); // row expanded for image preview
   const [showExportModal, setShowExportModal] = useState(false);
   const [includeExportPhotos, setIncludeExportPhotos] = useState(true);
+  const [deliveryExportColumns, setDeliveryExportColumns] = useState([
+    'Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo',
+  ]);
   const fileInputRef = React.useRef(null);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
 
   const handlePrintReport = () => {
+    if (!deliveryExportColumns.length) {
+      toast.error('Select at least one column to export');
+      return;
+    }
     setShowExportModal(false);
     const printWin = window.open('', '_blank');
     if (!printWin) return;
-    const rowsHtml = filtered.map(d => `
-      <tr>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d.recipient || d.itemName || '—'}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d.sender || d.company || '—'}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d.carrier || d.carRegistration || '—'}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '—'}</td>
-        <td style="padding:8px;border:1px solid #e2e8f0;">${d.collected ? 'Collected' : 'Pending'}</td>
-      </tr>
-    `).join('');
+    const deliveryFields = {
+      'Item / Recipient': d => d.recipient || d.itemName || '—',
+      'Sender / Company': d => d.sender || d.company || '—',
+      'Carrier / Reg': d => d.carrier || d.carRegistration || '—',
+      Received: d => d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '—',
+      Status: d => d.collected ? 'Collected' : 'Pending',
+    };
+    const tableColumns = deliveryExportColumns.filter(c => c !== 'Photo');
+    const rowsHtml = filtered.map(d => `<tr>${tableColumns.map(c =>
+      `<td style="padding:8px;border:1px solid #e2e8f0;">${deliveryFields[c](d)}</td>`
+    ).join('')}</tr>`).join('');
 
     let picsHtml = '';
-    if (includeExportPhotos) {
+    if (includeExportPhotos && deliveryExportColumns.includes('Photo')) {
       const withPics = filtered.filter(d => d.deliveryImageUrl);
       if (withPics.length > 0) {
         picsHtml = `
@@ -1478,11 +1489,7 @@ const DeliveriesTab = ({ siteId, siteName }) => {
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
             <thead>
               <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
-                <th style="padding:8px;border:1px solid #e2e8f0;">Item / Recipient</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Sender / Company</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Carrier / Reg</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Received</th>
-                <th style="padding:8px;border:1px solid #e2e8f0;">Status</th>
+                ${tableColumns.map(c => `<th style="padding:8px;border:1px solid #e2e8f0;">${c}</th>`).join('')}
               </tr>
             </thead>
             <tbody>${rowsHtml}</tbody>
@@ -1493,6 +1500,22 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       </html>
     `);
     printWin.document.close();
+  };
+
+  const handleDeliveryExcelExport = () => {
+    if (!deliveryExportColumns.length) return toast.error('Select at least one column to export');
+    const values = {
+      'Item / Recipient': d => d.recipient || d.itemName || '',
+      'Sender / Company': d => d.sender || d.company || '',
+      'Carrier / Reg': d => d.carrier || d.carRegistration || '',
+      Received: d => d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '',
+      Status: d => d.collected ? 'Collected' : 'Pending',
+      Photo: d => d.deliveryImageUrl ? 'Included' : '',
+    };
+    const rows = filtered.map(delivery => Object.fromEntries(deliveryExportColumns.map(column => [column, values[column](delivery)])));
+    downloadWorkbook(rows, `${(siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()}-deliveries-export.xlsx`, 'Deliveries');
+    toast.success(`Exported ${rows.length} delivery record${rows.length === 1 ? '' : 's'}`);
+    setShowExportModal(false);
   };
 
   useEffect(() => { if (siteId) fetchDeliveries(); }, [siteId]);
@@ -1812,6 +1835,20 @@ const DeliveriesTab = ({ siteId, siteName }) => {
                 <p className="text-xs text-slate-500">Uncheck to generate a clean table-only report</p>
               </div>
             </label>
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold text-slate-800">Columns to include</p>
+                <button type="button" onClick={() => setDeliveryExportColumns(['Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo'])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all</button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {['Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo'].map(column => (
+                  <label key={column} className="flex items-center gap-2 text-sm text-slate-700">
+                    <input type="checkbox" checked={deliveryExportColumns.includes(column)} onChange={() => setDeliveryExportColumns(current => current.includes(column) ? current.filter(c => c !== column) : [...current, column])} className="w-4 h-4 accent-[#2b4594]" />
+                    {column}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex justify-end gap-3">
               <button
                 type="button"
@@ -1826,6 +1863,13 @@ const DeliveriesTab = ({ siteId, siteName }) => {
                 className="inline-flex items-center gap-2 rounded-lg bg-[#2b4594] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e326e]"
               >
                 <Download size={15} /> Print / Export PDF
+              </button>
+              <button
+                type="button"
+                onClick={handleDeliveryExcelExport}
+                className="inline-flex items-center gap-2 rounded-lg border border-[#2b4594] px-4 py-2 text-sm font-semibold text-[#2b4594] hover:bg-blue-50"
+              >
+                <Download size={15} /> Export Excel
               </button>
             </div>
           </div>
