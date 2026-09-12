@@ -1171,6 +1171,8 @@ const ManagerScreen = ({ navigation }) => {
           </>
         )}
 
+      </ScrollView>
+
       <PersonDetailsModal
         visible={Boolean(selectedPerson)}
         onClose={() => setSelectedPerson(null)}
