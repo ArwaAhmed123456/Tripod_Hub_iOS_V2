@@ -289,6 +289,7 @@ router.put('/:id', verifyAdmin, async (req, res) => {
     site_id,
     siteId,
     trade,
+    employee_company_name,
     car_reg,
     carReg,
     reason,
@@ -311,6 +312,12 @@ router.put('/:id', verifyAdmin, async (req, res) => {
       log.userType = group || userType || log.userType || 'Visitor';
     }
     if (trade !== undefined) log.trade = trade;
+    if (employee_company_name !== undefined || group !== undefined || userType !== undefined) {
+      const activeGroup = String(group || userType || log.userType || '');
+      log.employeeCompanyName = activeGroup.toLowerCase().includes('employee') && employee_company_name
+        ? String(employee_company_name).trim()
+        : null;
+    }
     if (car_reg !== undefined || carReg !== undefined) {
       log.carReg = car_reg !== undefined ? car_reg : carReg;
     }

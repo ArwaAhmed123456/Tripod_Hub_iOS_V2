@@ -111,7 +111,8 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 
 const VISIT_EXPORT_FIELDS = [
   { id: 'Name', value: (visit) => visit.name || '' },
-  { id: 'Company', value: (visit) => visit.company || '' },
+  { id: 'Company', value: (visit) => visit.trade || visit.company || '' },
+  { id: 'Employee Company Name', value: (visit) => visit.employee_company_name || '' },
   { id: 'Site', value: (visit) => visit.site || '' },
   { id: 'Group', value: (visit) => visit.group || '' },
   { id: 'In time', value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -512,6 +513,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
   );
   const [group, setGroup] = useState(visit.group || 'Visitor');
   const [trade, setTrade] = useState(visit.trade || '');
+  const [employeeCompanyName, setEmployeeCompanyName] = useState(visit.employee_company_name || '');
   const [carReg, setCarReg] = useState(visit.car_reg || '');
   const [reason, setReason] = useState(visit.reason || '');
   const [date, setDate] = useState(extractDate(visit.date, visit.sign_in_time));
@@ -539,6 +541,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
         site_id: siteId,
         group,
         trade,
+        employee_company_name: group.toLowerCase().includes('employee') ? employeeCompanyName : '',
         car_reg: carReg,
         reason,
         date,
@@ -607,7 +610,11 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
               <label className="mb-1 block text-sm font-semibold text-slate-700">Group</label>
               <select
                 value={group}
-                onChange={(e) => setGroup(e.target.value)}
+                onChange={(e) => {
+                  const nextGroup = e.target.value;
+                  setGroup(nextGroup);
+                  if (!nextGroup.toLowerCase().includes('employee')) setEmployeeCompanyName('');
+                }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
               >
                 {(groups.length > 0 ? groups : [
@@ -699,6 +706,21 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
               />
             </div>
           </div>
+
+          {group.toLowerCase().includes('employee') && (
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-slate-700">
+                Employee Company Name <span className="text-xs font-normal text-slate-400">(Optional)</span>
+              </label>
+              <input
+                type="text"
+                value={employeeCompanyName}
+                onChange={(e) => setEmployeeCompanyName(e.target.value)}
+                placeholder="Enter employee company name"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
+              />
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-slate-700">Notes / Purpose of Visit</label>
@@ -1913,6 +1935,7 @@ const ActivityPage = () => {
     'Photo',
     'Site',
     'Group',
+    'Employee company',
     'Signed in',
     'Signed out',
     'Duration',
@@ -2215,6 +2238,11 @@ const ActivityPage = () => {
       render: (visit) => visit.group || '--',
     },
     {
+      key: 'Employee company',
+      header: <span>Employee company</span>,
+      render: (visit) => visit.employee_company_name || '--',
+    },
+    {
       key: 'Signed in',
       header: (
         <button type="button" onClick={() => handleSort('sign_in_time')} className="inline-flex items-center gap-1">
@@ -2280,7 +2308,7 @@ const ActivityPage = () => {
   ];
 
   // Separate columns into sections for the settings panel
-  const VISIT_DETAIL_COLS = ['Name', 'Photo', 'Site', 'Group', 'Signed in', 'Signed out', 'Duration', 'Notes'];
+  const VISIT_DETAIL_COLS = ['Name', 'Photo', 'Site', 'Group', 'Employee company', 'Signed in', 'Signed out', 'Duration', 'Notes'];
   const PERSONAL_FIELD_COLS = ['Email', 'Mobile', 'Role'];
 
   return (
@@ -2856,7 +2884,7 @@ const ActivityPage = () => {
             </div>
 
             {/* Sign in fields */}
-            {(selectedVisit.trade || selectedVisit.car_reg || selectedVisit.reason) && (
+            {(selectedVisit.trade || selectedVisit.employee_company_name || selectedVisit.car_reg || selectedVisit.reason) && (
               <div className="space-y-3">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Sign in fields</p>
                 <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3 text-sm">
@@ -2864,6 +2892,12 @@ const ActivityPage = () => {
                     <div className="grid grid-cols-2 gap-2">
                       <span className="text-slate-500">Trade</span>
                       <span className="font-medium text-slate-800">{selectedVisit.trade}</span>
+                    </div>
+                  )}
+                  {selectedVisit.employee_company_name && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <span className="text-slate-500">Employee company</span>
+                      <span className="font-medium text-slate-800">{selectedVisit.employee_company_name}</span>
                     </div>
                   )}
                   {selectedVisit.car_reg && (

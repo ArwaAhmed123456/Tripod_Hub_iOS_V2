@@ -33413,7 +33413,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-OXfQP2d0.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-CWBx935l.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -67103,7 +67103,8 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 };
 const VISIT_EXPORT_FIELDS = [
   { id: "Name", value: (visit) => visit.name || "" },
-  { id: "Company", value: (visit) => visit.company || "" },
+  { id: "Company", value: (visit) => visit.trade || visit.company || "" },
+  { id: "Employee Company Name", value: (visit) => visit.employee_company_name || "" },
   { id: "Site", value: (visit) => visit.site || "" },
   { id: "Group", value: (visit) => visit.group || "" },
   { id: "In time", value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -67485,6 +67486,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
   );
   const [group, setGroup] = reactExports.useState(visit.group || "Visitor");
   const [trade, setTrade] = reactExports.useState(visit.trade || "");
+  const [employeeCompanyName, setEmployeeCompanyName] = reactExports.useState(visit.employee_company_name || "");
   const [carReg, setCarReg] = reactExports.useState(visit.car_reg || "");
   const [reason, setReason] = reactExports.useState(visit.reason || "");
   const [date, setDate] = reactExports.useState(extractDate(visit.date, visit.sign_in_time));
@@ -67510,6 +67512,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
         site_id: siteId,
         group,
         trade,
+        employee_company_name: group.toLowerCase().includes("employee") ? employeeCompanyName : "",
         car_reg: carReg,
         reason,
         date,
@@ -67577,7 +67580,11 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
             "select",
             {
               value: group,
-              onChange: (e2) => setGroup(e2.target.value),
+              onChange: (e2) => {
+                const nextGroup = e2.target.value;
+                setGroup(nextGroup);
+                if (!nextGroup.toLowerCase().includes("employee")) setEmployeeCompanyName("");
+              },
               className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]",
               children: (groups.length > 0 ? groups : [
                 { id: "1", name: "Visitors" },
@@ -67676,6 +67683,22 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
             }
           )
         ] })
+      ] }),
+      group.toLowerCase().includes("employee") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: [
+          "Employee Company Name ",
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-normal text-slate-400", children: "(Optional)" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          "input",
+          {
+            type: "text",
+            value: employeeCompanyName,
+            onChange: (e2) => setEmployeeCompanyName(e2.target.value),
+            placeholder: "Enter employee company name",
+            className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
+          }
+        )
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Notes / Purpose of Visit" }),
@@ -68883,6 +68906,7 @@ const ActivityPage = () => {
     "Photo",
     "Site",
     "Group",
+    "Employee company",
     "Signed in",
     "Signed out",
     "Duration"
@@ -69124,6 +69148,11 @@ const ActivityPage = () => {
       render: (visit) => visit.group || "--"
     },
     {
+      key: "Employee company",
+      header: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Employee company" }),
+      render: (visit) => visit.employee_company_name || "--"
+    },
+    {
       key: "Signed in",
       header: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: () => handleSort("sign_in_time"), className: "inline-flex items-center gap-1", children: "Signed in" }),
       render: (visit) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
@@ -69169,7 +69198,7 @@ const ActivityPage = () => {
       render: (visit) => visit.role || "--"
     }
   ];
-  const VISIT_DETAIL_COLS = ["Name", "Photo", "Site", "Group", "Signed in", "Signed out", "Duration", "Notes"];
+  const VISIT_DETAIL_COLS = ["Name", "Photo", "Site", "Group", "Employee company", "Signed in", "Signed out", "Duration", "Notes"];
   const PERSONAL_FIELD_COLS = ["Email", "Mobile", "Role"];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full overflow-auto bg-slate-50", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(Fe$1, { position: "top-right" }),
@@ -69705,12 +69734,16 @@ const ActivityPage = () => {
               /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-slate-800", children: selectedVisit.duration || "—" })
             ] })
           ] }),
-          (selectedVisit.trade || selectedVisit.car_reg || selectedVisit.reason) && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+          (selectedVisit.trade || selectedVisit.employee_company_name || selectedVisit.car_reg || selectedVisit.reason) && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-bold uppercase tracking-wide text-slate-500", children: "Sign in fields" }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border border-slate-200 bg-white p-4 space-y-3 text-sm", children: [
               selectedVisit.trade && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Trade" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-slate-800", children: selectedVisit.trade })
+              ] }),
+              selectedVisit.employee_company_name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Employee company" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-slate-800", children: selectedVisit.employee_company_name })
               ] }),
               selectedVisit.car_reg && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Car registration" }),
