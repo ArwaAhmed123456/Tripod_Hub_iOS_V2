@@ -54,7 +54,12 @@ const cameraSchema = new mongoose.Schema({
     onvifUrl: {
         type: String,
         default: null,
-        select: false,
+        select: false, // Never returned to clients — used server-side for PTZ CGI calls only
+    },
+    // Optional: human-readable ONVIF host (no credentials) shown in admin UI for reference
+    onvifHost: {
+        type: String,
+        default: null,
     },
     order: {
         type: Number,

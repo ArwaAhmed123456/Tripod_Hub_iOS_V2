@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation, Link } from 'react-router-do
 import {
   ShieldCheck, HelpCircle, MessageSquare, User, LogOut,
   BellDot, BookOpen, MapPin, Users, Bell, Code, Settings as SettingsIcon,
-  Menu, X,
+  Menu, X, Shield,
 } from 'lucide-react';
 
 const AdminLayout = () => {
@@ -71,8 +71,10 @@ const AdminLayout = () => {
 
   const navLinks = [
     { to: '/admin/activity',   label: 'Activity'   },
+    { to: '/admin/cameras',    label: 'CCTV Cameras' },
     { to: '/admin/people',     label: 'People'     },
     { to: '/admin/attendance', label: 'Attendance' },
+    ...(adminRole === 'superadmin' ? [{ to: '/admin/superadmin', label: 'Super Admin' }] : []),
   ];
 
   const manageItems = [

@@ -1,38 +1,142 @@
-# MediaMTX Configuration for Tripod Security Camera Gateway
-# Converts RTSP from IP cameras to WebRTC (WHEP) and HLS for browser and mobile playback.
+# ─────────────────────────────────────────────────────────────────────────────
+# MediaMTX Configuration — Tripod Security Camera Gateway
+# Converts RTSP → HLS + WebRTC for browser & iOS Safari playback.
+#
+# Camera hardware (from device screenshots):
+#   Dahua DH-IPC-HDW2649TM-S-T-PV-Black
+#   Main stream: H.265, 3288×1850, 4096 Kbps, 20 FPS
+#   Sub stream:  H.265, 704×576 (D1), 512 Kbps, 20 FPS
+#   RTSP port:   554  (standard)
+#   HTTP port:   80   (CGI / PTZ)
+#   TCP port:    37777
+#
+# iOS Safari CANNOT decode H.265 via MSE (Media Source Extensions).
+# MediaMTX remuxes the RTSP into Low-Latency HLS (LL-HLS) served over HTTP.
+# Safari uses its native <video> HLS decoder which DOES support H.265 on
+# iPhone 12+ / iOS 16+. For older iPhones use the sub-stream (H.265 at lower
+# bitrate — Safari handles it the same way). hls.js on non-Safari browsers
+# handles the HLS playlist with its own MSE pipeline.
+# ─────────────────────────────────────────────────────────────────────────────
 
 logLevel: info
 logDestinations: [stdout]
 
-# RTSP listening port (if cameras push RTSP to this server)
+# ── RTSP input listener ───────────────────────────────────────────────────────
+# Cameras push or MediaMTX pulls via RTSP TCP (more reliable through NAT).
 rtsp: yes
-protocols: [tcp, udp]
+protocols: [tcp]          # TCP only — avoids UDP packet loss on Wi-Fi
 rtspAddress: :8554
 
-# WebRTC (WHEP) listening port for ultra-low-latency browser / mobile streaming (< 500ms delay)
+# ── WebRTC / WHEP output ─────────────────────────────────────────────────────
+# Ultra-low latency (< 500 ms) for desktop Chrome/Firefox.
+# iOS Safari does NOT support WHEP reliably, so HLS is the iOS path.
 webrtc: yes
 webrtcAddress: :8889
 webrtcEncryption: no
 webrtcAllowFrameDropping: yes
 
-# HLS listening port for universal browser / iOS fallback
+# ── HLS output (primary iOS path) ────────────────────────────────────────────
+# Low-Latency HLS (LL-HLS, RFC 8216bis) — supported natively in iOS Safari.
+# Segment duration of 1 s with 200 ms parts gives ~1-2 s glass-to-glass delay.
 hls: yes
 hlsAddress: :8888
-hlsAlwaysRemux: no
-hlsVariant: lowLatency
-hlsSegmentCount: 5
+hlsAlwaysRemux: yes        # Always produce HLS even if no one is watching —
+                            # this ensures the first iOS client gets segments immediately
+hlsVariant: lowLatency     # Enables LL-HLS (EXT-X-PART)
+hlsSegmentCount: 6         # Keep 6 full segments (~6 s) in the playlist
 hlsSegmentDuration: 1s
-hlsPartDuration: 200ms
+hlsPartDuration: 200ms     # LL-HLS partial segments — reduces startup latency
 
-# Path definitions
-# MediaMTX supports on-demand pulling from cameras when a manager connects.
+# ── Path definitions ─────────────────────────────────────────────────────────
+# Add one block per camera.  Two paths per camera:
+#   <stream_key>      — Main stream  (H.265 high-res, used on desktop / fast Wi-Fi)
+#   <stream_key>_sub  — Sub stream   (H.265 704×576, auto-selected on mobile/iOS)
+#
+# Replace the RTSP URLs below with your actual camera credentials and IPs.
+# The Admin panel writes these stream keys when adding a camera; keep the
+# naming convention: cam_<site>_<name> (all lowercase, underscores).
+#
+# sourceOnDemand: yes  — MediaMTX only opens the RTSP connection when a viewer
+#                        is actually watching; closes after closeAfter seconds idle.
+#                        This respects Dahua's Max Connection limit of 10.
+#
+# HOW TO ADD A NEW CAMERA:
+#   1. Add a camera in the Tripod Hub admin panel (Camera > Add Camera).
+#   2. Copy the generated stream_key from the response.
+#   3. Add two path entries here (main + _sub) with the camera's RTSP URLs.
+#   4. Restart MediaMTX (or send SIGHUP to reload).
+# ─────────────────────────────────────────────────────────────────────────────
+
 paths:
-  # Catch-all on-demand RTSP proxy path
-  # Example: requesting /cam_site_gate pulls from the configured RTSP stream
+
+  # ── Tower Camera 1 (S/N BG0E666PAG8E0D1) ──────────────────────────────────────
+  cam_tower_1:
+    source: rtsp://admin:admin@192.168.1.106:554/cam/realmonitor?channel=1&subtype=0
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  cam_tower_1_sub:
+    source: rtsp://admin:admin@192.168.1.106:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  # ── Tower Camera 2 (S/N BG0E666PAG5AB1D) ──────────────────────────────────────
+  cam_tower_2:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  cam_tower_2_sub:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  # ── Tower Camera 3 (S/N BG0E666PAG228A9) ──────────────────────────────────────
+  cam_tower_3:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  cam_tower_3_sub:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  # ── Tower Camera 4 (S/N BG0E666PAG91803) ──────────────────────────────────────
+  cam_tower_4:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=0
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  cam_tower_4_sub:
+    source: rtsp://admin:admin@192.168.1.100:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+  # ── Tower 22 Camera 1 (S/N AD0D8D1PAG1A567, DH-IPC-HDW3549H-AS-PV-G) ────────────────────────
+  # Tower TG1003C — Horton Field  |  IP 192.168.1.103  |  MAC d4:43:0e:f3:6c:76
+  # DHCP mode — recommend setting static IP to avoid address changes
+  cam_tg1003c_1:
+    source: rtsp://admin:admin@192.168.1.103:554/cam/realmonitor?channel=1&subtype=0
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+  cam_tg1003c_1_sub:
+    source: rtsp://admin:admin@192.168.1.103:554/cam/realmonitor?channel=1&subtype=1
+    sourceOnDemand: yes
+    sourceOnDemandStartTimeout: 12s
+    sourceOnDemandCloseAfter: 30s
+
+
+
+  # ── Catch-all: accepts cameras that push RTSP directly to MediaMTX ─────────
   all_others:
-    # On-demand source pull:
-    # source: rtsp://username:password@camera-ip:554/stream1
-    # sourceOnDemand: yes
-    # sourceOnDemandStartTimeout: 10s
-    # sourceOnDemandCloseAfter: 10s
     source: publisher

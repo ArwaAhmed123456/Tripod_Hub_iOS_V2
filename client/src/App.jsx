@@ -25,6 +25,8 @@ import PublicVisitorCheckIn from './pages/PublicVisitorCheckIn';
 import PublicSupportPage from './pages/PublicSupportPage';
 import PublicLanding from './pages/PublicLanding';
 import PendingOrganizations from './pages/manage/PendingOrganizations';
+import CamerasPage from './pages/CamerasPage';
+import SuperAdminPage from './pages/SuperAdminPage';
 
 const App = () => {
   return (
@@ -66,6 +68,7 @@ const App = () => {
         >
           <Route index element={<Navigate to="/admin/activity" replace />} />
           <Route path="activity"    element={<ActivityPage />} />
+          <Route path="cameras"     element={<CamerasPage />} />
           <Route path="attendance"  element={<AttendancePage />} />
           <Route path="people"      element={<PeopleDirectory />} />
           <Route path="manage/*"    element={<ManageSettings />} />
@@ -77,6 +80,15 @@ const App = () => {
           <Route path="profile"     element={<ProfilePage />} />
           {/* Pending Organizations (superadmin only) */}
           <Route path="pending-organizations" element={<PendingOrganizations />} />
+          {/* Super Admin Console (superadmin only) */}
+          <Route
+            path="superadmin"
+            element={
+              <ProtectedRoute roleRequired="superadmin">
+                <SuperAdminPage />
+              </ProtectedRoute>
+            }
+          />
           {/* Legacy */}
           <Route path="project/:id" element={<ProjectDetails />} />
         </Route>

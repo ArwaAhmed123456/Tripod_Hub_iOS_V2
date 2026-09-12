@@ -1426,9 +1426,74 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [imageFile, setImageFile] = useState(null);   // raw File from picker
   const [imagePreview, setImagePreview] = useState(null); // object URL for <img>
   const [expandedId, setExpandedId] = useState(null); // row expanded for image preview
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [includeExportPhotos, setIncludeExportPhotos] = useState(true);
   const fileInputRef = React.useRef(null);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
+
+  const handlePrintReport = () => {
+    setShowExportModal(false);
+    const printWin = window.open('', '_blank');
+    if (!printWin) return;
+    const rowsHtml = filtered.map(d => `
+      <tr>
+        <td style="padding:8px;border:1px solid #e2e8f0;">${d.recipient || d.itemName || '—'}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;">${d.sender || d.company || '—'}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;">${d.carrier || d.carRegistration || '—'}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;">${d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '—'}</td>
+        <td style="padding:8px;border:1px solid #e2e8f0;">${d.collected ? 'Collected' : 'Pending'}</td>
+      </tr>
+    `).join('');
+
+    let picsHtml = '';
+    if (includeExportPhotos) {
+      const withPics = filtered.filter(d => d.deliveryImageUrl);
+      if (withPics.length > 0) {
+        picsHtml = `
+          <div style="margin-top:30px;page-break-before:always">
+            <h3 style="margin-bottom:12px;color:#1e293b">Attached Delivery Pictures</h3>
+            <div style="display:flex;flex-wrap:wrap;gap:16px;">
+              ${withPics.map(d => `
+                <div style="border:1px solid #e2e8f0;padding:8px;border-radius:6px;width:240px">
+                  <p style="margin:0 0 6px;font-size:12px;font-weight:bold">${d.recipient || d.itemName || 'Item'}</p>
+                  <img src="${API_BASE}${d.deliveryImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:4px" />
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    printWin.document.write(`
+      <html>
+        <head>
+          <title>Delivery Report - ${siteName || 'Site'}</title>
+          <style>body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; }</style>
+        </head>
+        <body>
+          <h2>Delivery Report — ${siteName || 'Site'}</h2>
+          <p style="color:#64748b;font-size:13px">Generated on ${new Date().toLocaleString('en-GB')}</p>
+          <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+            <thead>
+              <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
+                <th style="padding:8px;border:1px solid #e2e8f0;">Item / Recipient</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;">Sender / Company</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;">Carrier / Reg</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;">Received</th>
+                <th style="padding:8px;border:1px solid #e2e8f0;">Status</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          ${picsHtml}
+          <script>window.onload = function() { window.print(); window.close(); }<\/script>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+  };
 
   useEffect(() => { if (siteId) fetchDeliveries(); }, [siteId]);
 
@@ -1528,6 +1593,13 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             />
           </div>
           <div className="flex-1" />
+          <button
+            type="button"
+            onClick={() => setShowExportModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 shadow-sm"
+          >
+            <Download size={15} /> Export Report
+          </button>
           <button
             type="button"
             onClick={() => setShowModal(true)}
@@ -1712,6 +1784,50 @@ const DeliveriesTab = ({ siteId, siteName }) => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Export Report Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-slate-800">Export Delivery Report</h3>
+              <button onClick={() => setShowExportModal(false)} className="text-slate-400 hover:text-slate-600">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              Ready to export <strong>{filtered.length}</strong> delivery record(s) for <strong>{siteName || 'Current Site'}</strong>.
+            </p>
+            <label className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer mb-5">
+              <input
+                type="checkbox"
+                checked={includeExportPhotos}
+                onChange={e => setIncludeExportPhotos(e.target.checked)}
+                className="w-4 h-4 rounded accent-[#2b4594]"
+              />
+              <div>
+                <span className="text-sm font-semibold text-slate-800">Include delivery pictures in printable report</span>
+                <p className="text-xs text-slate-500">Uncheck to generate a clean table-only report</p>
+              </div>
+            </label>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowExportModal(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePrintReport}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#2b4594] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e326e]"
+              >
+                <Download size={15} /> Print / Export PDF
+              </button>
+            </div>
           </div>
         </div>
       )}

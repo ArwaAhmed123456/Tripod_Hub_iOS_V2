@@ -4,8 +4,10 @@ const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
 const Camera = require('../models/Camera');
 const Site = require('../models/Site');
+const Admin = require('../models/Admin');
 const Member = require('../models/Member');
 const { generateStreamToken, getPlayableStreamUrls } = require('../services/mediaServerService');
+const ptzService = require('../services/ptzService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_key_123';
 
@@ -38,26 +40,65 @@ const verifyManagerOrAdmin = async (req, res, next) => {
 };
 
 /**
- * Helper: Verify if user has permission to access a specific site's cameras.
+ * Helper: Verify if user has permission to access a specific site.
  */
 const checkSiteAccess = async (user, siteId) => {
-    if (!siteId) return false;
     const role = (user.role || '').toLowerCase();
-
-    // Superadmin has access to all sites
     if (role === 'superadmin' || role === 'admin') return true;
 
-    // Check if user is a member assigned to this site
-    if (user.siteId && String(user.siteId) === String(siteId)) return true;
+    const perms = await getUserPermissions(user);
+    if (!perms) return false;
+    if (perms.isSuperAdmin) return true;
+    if (!perms.allowedSites || perms.allowedSites.length === 0) return true; // no restriction = all sites
+    return perms.allowedSites.includes(String(siteId));
+};
 
-    if (user.id && mongoose.isValidObjectId(user.id)) {
-        const member = await Member.findById(user.id).lean();
-        if (member) {
-            if (member.siteId && String(member.siteId) === String(siteId)) return true;
-        }
+/**
+ * Helper: Verify if user has permission to access a specific site's cameras or a specific camera.
+ */
+const getUserPermissions = async (user) => {
+    if (!user.id) return null;
+    const role = (user.role || '').toLowerCase();
+    if (role === 'superadmin') return { isSuperAdmin: true };
+
+    let record = await Admin.findById(user.id).lean();
+    if (record) {
+        return {
+            allowedSites: record.granular_permissions?.allowed_sites?.map(String) || [],
+            allowedCameras: record.granular_permissions?.allowed_cameras?.map(String) || [],
+            canViewCameras: record.granular_permissions?.module_permissions?.can_view_cameras !== false,
+        };
     }
 
-    // Default site resolution for managers with single project access
+    record = await Member.findById(user.id).lean();
+    if (record) {
+        return {
+            allowedSites: record.granularPermissions?.allowedSites?.map(String) || (record.siteId ? [String(record.siteId)] : []),
+            allowedCameras: record.granularPermissions?.allowedCameras?.map(String) || [],
+            canViewCameras: record.granularPermissions?.modulePermissions?.can_view_cameras !== false,
+        };
+    }
+
+    return null;
+};
+
+const checkCameraAccess = async (user, camera) => {
+    const role = (user.role || '').toLowerCase();
+    if (role === 'superadmin') return true;
+
+    const perms = await getUserPermissions(user);
+    if (!perms || perms.canViewCameras === false) return false;
+
+    // If specific cameras are assigned, check if this camera is in the list
+    if (perms.allowedCameras && perms.allowedCameras.length > 0) {
+        return perms.allowedCameras.includes(String(camera._id));
+    }
+
+    // Otherwise check if camera's site is allowed
+    if (perms.allowedSites && perms.allowedSites.length > 0) {
+        return perms.allowedSites.includes(String(camera.siteId));
+    }
+
     return true;
 };
 
@@ -70,6 +111,10 @@ const formatCameraResponse = (cam) => ({
     stream_key: cam.streamKey,
     status: cam.status,
     ptz_supported: cam.ptzSupported || false,
+    // Let the UI know whether an ONVIF/CGI address is configured so it can
+    // show PTZ controls confidently (the actual URL is never sent to the client).
+    has_onvif: Boolean(cam.onvifUrl || cam.rtspUrl),
+    onvif_host: cam.onvifHost || null,   // display-only, no credentials
     has_substream: Boolean(cam.subStreamRtspUrl),
     order: cam.order || 0,
     last_online_at: cam.lastOnlineAt,
@@ -91,7 +136,16 @@ router.get('/', verifyManagerOrAdmin, async (req, res) => {
             query.siteId = site_id;
         }
 
-        const cameras = await Camera.find(query).sort({ order: 1, name: 1 }).lean();
+        let cameras = await Camera.find(query).sort({ order: 1, name: 1 }).lean();
+        if (req.user.role !== 'superadmin') {
+            const filtered = [];
+            for (const cam of cameras) {
+                if (await checkCameraAccess(req.user, cam)) {
+                    filtered.push(cam);
+                }
+            }
+            cameras = filtered;
+        }
         res.json(cameras.map(formatCameraResponse));
     } catch (err) {
         console.error('[Cameras API] List error:', err);
@@ -112,9 +166,9 @@ router.post('/:id/stream-session', verifyManagerOrAdmin, async (req, res) => {
             return res.status(400).json({ error: 'This camera stream is currently disabled' });
         }
 
-        const hasAccess = await checkSiteAccess(req.user, camera.siteId);
+        const hasAccess = await checkCameraAccess(req.user, camera);
         if (!hasAccess) {
-            return res.status(403).json({ error: 'Access denied: You are not assigned to this camera site' });
+            return res.status(403).json({ error: 'Access denied: You do not have permission to view this camera' });
         }
 
         const token = generateStreamToken({ camera, user: req.user, expiresInSeconds: 900 });
@@ -134,7 +188,7 @@ router.post('/:id/stream-session', verifyManagerOrAdmin, async (req, res) => {
 // ─── POST /api/cameras (Admin only) ───────────────────────────────────────────
 // Create a new camera linking to a site and RTSP source
 router.post('/', verifyManagerOrAdmin, async (req, res) => {
-    const { site_id, name, location, rtsp_url, sub_stream_rtsp_url, stream_key, ptz_supported } = req.body;
+    const { site_id, name, location, rtsp_url, sub_stream_rtsp_url, stream_key, ptz_supported, onvif_url, onvif_host } = req.body;
 
     if (!site_id || !name || !rtsp_url) {
         return res.status(400).json({ error: 'site_id, name, and rtsp_url are required' });
@@ -154,6 +208,8 @@ router.post('/', verifyManagerOrAdmin, async (req, res) => {
             subStreamRtspUrl: sub_stream_rtsp_url ? sub_stream_rtsp_url.trim() : null,
             streamKey: generatedStreamKey,
             ptzSupported: Boolean(ptz_supported),
+            onvifUrl: onvif_url ? onvif_url.trim() : null,
+            onvifHost: onvif_host ? onvif_host.trim() : null,
             status: 'online',
         });
 
@@ -174,7 +230,7 @@ router.post('/', verifyManagerOrAdmin, async (req, res) => {
 // ─── PUT /api/cameras/:id (Admin only) ────────────────────────────────────────
 // Update camera details
 router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
-    const { name, location, rtsp_url, sub_stream_rtsp_url, status, ptz_supported, order } = req.body;
+    const { name, location, rtsp_url, sub_stream_rtsp_url, status, ptz_supported, order, onvif_url, onvif_host } = req.body;
 
     try {
         const updates = {};
@@ -185,6 +241,8 @@ router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
         if (status !== undefined) updates.status = status;
         if (ptz_supported !== undefined) updates.ptzSupported = Boolean(ptz_supported);
         if (order !== undefined) updates.order = Number(order);
+        if (onvif_url !== undefined) updates.onvifUrl = onvif_url ? onvif_url.trim() : null;
+        if (onvif_host !== undefined) updates.onvifHost = onvif_host ? onvif_host.trim() : null;
 
         const camera = await Camera.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!camera) return res.status(404).json({ error: 'Camera not found' });
@@ -209,6 +267,95 @@ router.delete('/:id', verifyManagerOrAdmin, async (req, res) => {
     } catch (err) {
         console.error('[Cameras API] Delete error:', err);
         res.status(500).json({ error: 'Failed to delete camera' });
+    }
+});
+
+// ─── POST /api/cameras/:id/ptz ────────────────────────────────────────────────
+// Send a PTZ start command (continuous move until /ptz/stop is called).
+// Body: { action: 'start'|'stop'|'preset', direction?: string, speed?: number, preset?: number, channel?: number }
+//
+// Permission: same as stream-session — Manager+ with camera access.
+// Credentials NEVER leave the server — the client only sends direction/speed.
+router.post('/:id/ptz', verifyManagerOrAdmin, async (req, res) => {
+    try {
+        const camera = await Camera.findById(req.params.id).select('+rtspUrl +onvifUrl');
+        if (!camera) return res.status(404).json({ error: 'Camera not found' });
+
+        if (!camera.ptzSupported) {
+            return res.status(400).json({ error: 'This camera does not support PTZ control' });
+        }
+
+        const hasAccess = await checkCameraAccess(req.user, camera);
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'Access denied: You do not have permission to control this camera' });
+        }
+
+        const { action = 'start', direction, speed = 5, preset, channel = 0 } = req.body;
+
+        let result;
+
+        switch (action) {
+            case 'start': {
+                if (!direction) return res.status(400).json({ error: 'direction is required for action=start' });
+                result = await ptzService.start(camera, direction, speed, channel);
+                break;
+            }
+            case 'stop': {
+                result = await ptzService.stop(camera, direction || null, channel);
+                break;
+            }
+            case 'goto_preset': {
+                if (preset === undefined) return res.status(400).json({ error: 'preset is required for action=goto_preset' });
+                result = await ptzService.gotoPreset(camera, preset, channel);
+                break;
+            }
+            case 'set_preset': {
+                // Only admins/superadmins may write new presets
+                const role = (req.user.role || '').toLowerCase();
+                if (!['admin', 'superadmin'].includes(role)) {
+                    return res.status(403).json({ error: 'Only admins can save PTZ presets' });
+                }
+                if (preset === undefined) return res.status(400).json({ error: 'preset is required for action=set_preset' });
+                result = await ptzService.setPreset(camera, preset, channel);
+                break;
+            }
+            default:
+                return res.status(400).json({ error: `Unknown PTZ action: ${action}` });
+        }
+
+        res.json({ success: true, action, direction: direction || null, result: String(result || 'OK') });
+    } catch (err) {
+        console.error('[Cameras API] PTZ error:', err.message);
+        // Surface a friendly error — camera may be unreachable or reject auth
+        const isNetworkErr = err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET';
+        res.status(502).json({
+            error: isNetworkErr
+                ? 'Unable to reach camera for PTZ command. Check that the camera HTTP port (80) is accessible from the server.'
+                : err.message || 'PTZ command failed',
+        });
+    }
+});
+
+// ─── GET /api/cameras/:id/ptz/capabilities ────────────────────────────────────
+// Returns whether PTZ is supported + list of valid directions for UI rendering.
+router.get('/:id/ptz/capabilities', verifyManagerOrAdmin, async (req, res) => {
+    try {
+        const camera = await Camera.findById(req.params.id);
+        if (!camera) return res.status(404).json({ error: 'Camera not found' });
+
+        const hasAccess = await checkCameraAccess(req.user, camera);
+        if (!hasAccess) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        res.json({
+            ptz_supported: camera.ptzSupported || false,
+            directions: Object.keys(ptzService.DIRECTION_MAP),
+            presets: [1, 2, 3, 4, 5, 6, 7, 8],   // Dahua IPC supports up to 255; show 8 in UI
+        });
+    } catch (err) {
+        console.error('[Cameras API] PTZ capabilities error:', err);
+        res.status(500).json({ error: 'Failed to get PTZ capabilities' });
     }
 });
 
