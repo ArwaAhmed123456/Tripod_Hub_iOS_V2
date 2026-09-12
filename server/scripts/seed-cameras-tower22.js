@@ -39,19 +39,17 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 const fs       = require('fs');
 const path     = require('path');
 const mongoose = require('mongoose');
-const bcrypt   = require('bcryptjs');
 const Camera   = require('../models/Camera');
 const Site     = require('../models/Site');
 
-const CAMERA_PASSWORD = process.env.CAMERA_PASSWORD || 'admin';
+// Keep camera credentials out of source control.
+const CAMERA_PASSWORD = process.env.CAMERA_PASSWORD;
 const RTSP_PORT       = 554;
 const HTTP_PORT       = 80;
 
-// ─── Tower 22 site definition ─────────────────────────────────────────────────
-const TOWER22_SITE = {
-  name: 'Horton Field',
-  code: 'TG1003C',        // Tower ID used as site code
-};
+// Tower ID is TG1003C, but it belongs to the existing Horton Solar Farm site;
+// it must not create a separate "Horton Field" company/site.
+const TARGET_SITE_NAME = process.env.CAMERA_SITE_NAME || 'IB Vogt - Horton Solar Farm';
 
 // ─── Tower 22 cameras ─────────────────────────────────────────────────────────
 // Only 1 camera confirmed from screenshots. Add more entries here as details
@@ -63,7 +61,7 @@ const CAMERAS = [
     mac:       'd4:43:0e:f3:6c:76',
     model:     'DH-IPC-HDW3549H-AS-PV-G',
     name:      'Tower 22 Camera 1',
-    location:  'Horton Field — Tower TG1003C',
+    location:  'Horton Solar Farm — Tower TG1003C',
     streamKey: 'cam_tg1003c_1',
     ptz:       true,
     note:      'DHCP mode — recommend setting static IP to avoid address changes',
@@ -90,7 +88,7 @@ function updateMediamtxYml(cameras) {
 
     const mainBlock = `
   # ── ${cam.name} (S/N ${cam.serial}, ${cam.model}) ────────────────────────
-  # Tower TG1003C — Horton Field  |  IP ${cam.ip}  |  MAC ${cam.mac}
+  # Tower TG1003C — Horton Solar Farm  |  IP ${cam.ip}  |  MAC ${cam.mac}
   # ${cam.note}
   ${mainKey}:
     source: ${rtspMain(cam.ip)}
@@ -130,23 +128,13 @@ function updateMediamtxYml(cameras) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
+  if (!CAMERA_PASSWORD) throw new Error('CAMERA_PASSWORD must be set before seeding cameras');
   await mongoose.connect(process.env.MONGO_URI, { dbName: 'Tripod_SignIn_App' });
   console.log('MongoDB connected to Tripod_SignIn_App\n');
 
-  // ── Upsert the Horton Field site ──────────────────────────────────────────
-  let site = await Site.findOne({ code: TOWER22_SITE.code });
-  if (!site) {
-    // Need a hashed password for the site record
-    const hashed = await bcrypt.hash('Admin@1234', 10);
-    site = await Site.create({
-      name:     TOWER22_SITE.name,
-      code:     TOWER22_SITE.code,
-      password: hashed,
-    });
-    console.log(`✓ Created site: "${site.name}" (code: ${site.code}, id: ${site._id})`);
-  } else {
-    console.log(`✓ Found site:   "${site.name}" (code: ${site.code}, id: ${site._id})`);
-  }
+  const site = await Site.findOne({ name: new RegExp(`^${TARGET_SITE_NAME}$`, 'i') });
+  if (!site) throw new Error(`Site "${TARGET_SITE_NAME}" was not found. Cameras were not changed.`);
+  console.log(`✓ Target site: "${site.name}" (${site._id})`);
 
   // ── Upsert cameras ────────────────────────────────────────────────────────
   let created = 0, updated = 0;

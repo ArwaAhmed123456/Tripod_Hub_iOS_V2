@@ -40,13 +40,14 @@ const Camera    = require('../models/Camera');
 const Site      = require('../models/Site');
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const CAMERA_PASSWORD = process.env.CAMERA_PASSWORD || 'admin'; // override in .env
+// Keep camera credentials out of source control.
+const CAMERA_PASSWORD = process.env.CAMERA_PASSWORD;
 const RTSP_PORT       = 554;
 const HTTP_PORT       = 80;
 
-// Site to attach cameras to.  We look for "Totmonslow" first (the real site
-// from seed_data.json), then fall back to the first site in the DB.
-const PREFERRED_SITE_NAME = process.env.CAMERA_SITE_NAME || 'Totmonslow';
+// These cameras belong only to this existing company site. Do not fall back to
+// another site, as that would expose CCTV feeds to the wrong organisation.
+const PREFERRED_SITE_NAME = process.env.CAMERA_SITE_NAME || 'IB Vogt - Horton Solar Farm';
 
 // ─── Camera definitions ───────────────────────────────────────────────────────
 // All 4 cameras are Dahua DH-IPC-HDW2649TM-S-T-PV-Black on the site tower.
@@ -56,32 +57,32 @@ const CAMERAS = [
   {
     ip:         '192.168.1.106',        // Confirmed real IP from TCP/IP screenshot
     serial:     'BG0E666PAG8E0D1',
-    name:       'Tower Camera 1',
-    location:   'Security Tower — Cam 1',
+    name:       'Tower 15 Camera 1',
+    location:   'Horton Solar Farm — Tower 15 — Camera 1',
     streamKey:  'cam_tower_1',
     ptz:        true,
   },
   {
     ip:         '192.168.1.100',        // ← Assign unique static IP, update here, re-run
     serial:     'BG0E666PAG5AB1D',
-    name:       'Tower Camera 2',
-    location:   'Security Tower — Cam 2',
+    name:       'Tower 15 Camera 2',
+    location:   'Horton Solar Farm — Tower 15 — Camera 2',
     streamKey:  'cam_tower_2',
     ptz:        true,
   },
   {
     ip:         '192.168.1.100',        // ← Assign unique static IP, update here, re-run
     serial:     'BG0E666PAG228A9',
-    name:       'Tower Camera 3',
-    location:   'Security Tower — Cam 3',
+    name:       'Tower 15 Camera 3',
+    location:   'Horton Solar Farm — Tower 15 — Camera 3',
     streamKey:  'cam_tower_3',
     ptz:        true,
   },
   {
     ip:         '192.168.1.100',        // ← Assign unique static IP, update here, re-run
     serial:     'BG0E666PAG91803',
-    name:       'Tower Camera 4',
-    location:   'Security Tower — Cam 4',
+    name:       'Tower 15 Camera 4',
+    location:   'Horton Solar Farm — Tower 15 — Camera 4',
     streamKey:  'cam_tower_4',
     ptz:        true,
   },
@@ -135,16 +136,14 @@ ${buildMediamtxPaths(cameras)}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function run() {
+  if (!CAMERA_PASSWORD) throw new Error('CAMERA_PASSWORD must be set before seeding cameras');
   await mongoose.connect(process.env.MONGO_URI, { dbName: 'Tripod_SignIn_App' });
   console.log('MongoDB connected to Tripod_SignIn_App\n');
 
   // Find target site
-  let site = await Site.findOne({ name: new RegExp(PREFERRED_SITE_NAME, 'i') }).lean();
+  const site = await Site.findOne({ name: new RegExp(`^${PREFERRED_SITE_NAME}$`, 'i') }).lean();
   if (!site) {
-    site = await Site.findOne().sort({ createdAt: 1 }).lean();
-  }
-  if (!site) {
-    console.error('✗ No sites found in the database. Please create a site first.');
+    console.error(`✗ Site "${PREFERRED_SITE_NAME}" was not found. Cameras were not changed.`);
     process.exit(1);
   }
   console.log(`✓ Target site: "${site.name}" (${site._id})\n`);
