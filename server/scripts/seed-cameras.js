@@ -47,7 +47,7 @@ const HTTP_PORT       = 80;
 
 // These cameras belong only to this existing company site. Do not fall back to
 // another site, as that would expose CCTV feeds to the wrong organisation.
-const PREFERRED_SITE_NAME = process.env.CAMERA_SITE_NAME || 'IB Vogt - Horton Solar Farm';
+const PREFERRED_SITE_NAME = process.env.CAMERA_SITE_NAME || 'Horton Solar Farm';
 
 // ─── Camera definitions ───────────────────────────────────────────────────────
 // All 4 cameras are Dahua DH-IPC-HDW2649TM-S-T-PV-Black on the site tower.
@@ -141,7 +141,7 @@ async function run() {
   console.log('MongoDB connected to Tripod_SignIn_App\n');
 
   // Find target site
-  const site = await Site.findOne({ name: new RegExp(`^${PREFERRED_SITE_NAME}$`, 'i') }).lean();
+  const site = await Site.findOne({ name: new RegExp(PREFERRED_SITE_NAME, 'i') }).lean();
   if (!site) {
     console.error(`✗ Site "${PREFERRED_SITE_NAME}" was not found. Cameras were not changed.`);
     process.exit(1);

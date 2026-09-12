@@ -49,7 +49,7 @@ const HTTP_PORT       = 80;
 
 // Tower ID is TG1003C, but it belongs to the existing Horton Solar Farm site;
 // it must not create a separate "Horton Field" company/site.
-const TARGET_SITE_NAME = process.env.CAMERA_SITE_NAME || 'IB Vogt - Horton Solar Farm';
+const TARGET_SITE_NAME = process.env.CAMERA_SITE_NAME || 'Horton Solar Farm';
 
 // ─── Tower 22 cameras ─────────────────────────────────────────────────────────
 // Only 1 camera confirmed from screenshots. Add more entries here as details
@@ -132,7 +132,7 @@ async function run() {
   await mongoose.connect(process.env.MONGO_URI, { dbName: 'Tripod_SignIn_App' });
   console.log('MongoDB connected to Tripod_SignIn_App\n');
 
-  const site = await Site.findOne({ name: new RegExp(`^${TARGET_SITE_NAME}$`, 'i') });
+  const site = await Site.findOne({ name: new RegExp(TARGET_SITE_NAME, 'i') });
   if (!site) throw new Error(`Site "${TARGET_SITE_NAME}" was not found. Cameras were not changed.`);
   console.log(`✓ Target site: "${site.name}" (${site._id})`);
 
