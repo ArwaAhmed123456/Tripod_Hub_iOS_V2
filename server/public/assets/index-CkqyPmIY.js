@@ -33413,7 +33413,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-CWBx935l.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-DXydW2JC.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -67103,8 +67103,17 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 };
 const VISIT_EXPORT_FIELDS = [
   { id: "Name", value: (visit) => visit.name || "" },
+  { id: "Date", value: (visit) => formatDateTime(visit.sign_in_time || visit.created_at).split(",")[0] || "" },
+  { id: "Time In", value: (visit) => formatDateTime(visit.sign_in_time) },
+  { id: "Time Out", value: (visit) => formatDateTime(visit.sign_out_time) },
+  { id: "Role", value: (visit) => visit.group || visit.user_type || "" },
   { id: "Company", value: (visit) => visit.trade || visit.company || "" },
   { id: "Employee Company Name", value: (visit) => visit.employee_company_name || "" },
+  { id: "Expected Arrival", value: (visit) => formatDateTime(visit.expected_date || visit.expectedArrival) },
+  { id: "Description", value: (visit) => visit.description || visit.reason || "" },
+  { id: "Purpose of Visit", value: (visit) => visit.reason || "" },
+  { id: "Hrs", value: (visit) => String(visit.hours ?? "").replace(/\.\d+$/, "") },
+  { id: "Mins", value: (visit) => String(Math.round(Number(visit.hours || 0) % 1 * 60) || "") },
   { id: "Site", value: (visit) => visit.site || "" },
   { id: "Group", value: (visit) => visit.group || "" },
   { id: "In time", value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -67136,10 +67145,13 @@ const ExportModal$2 = ({ visits, groups, siteName, onClose }) => {
   const [selectedGroup, setSelectedGroup] = reactExports.useState("All");
   const [selectedFields, setSelectedFields] = reactExports.useState([
     "Name",
-    "Site",
-    "Group",
-    "In time",
-    "Out time"
+    "Date",
+    "Time In",
+    "Time Out",
+    "Role",
+    "Company",
+    "Hrs",
+    "Mins"
   ]);
   const groupedVisits = reactExports.useMemo(() => {
     if (selectedGroup === "All") return visits;
@@ -68379,7 +68391,7 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [loading, setLoading] = reactExports.useState(false);
   const [search, setSearch] = reactExports.useState("");
   const [showModal, setShowModal] = reactExports.useState(false);
-  const [form, setForm] = reactExports.useState({ recipient: "", sender: "", carrier: "", notes: "" });
+  const [form, setForm] = reactExports.useState({ name: "", supplier: "", car_registration: "", delivery_document_number: "", product: "", net_weight: "", notes: "" });
   const [saving, setSaving] = reactExports.useState(false);
   const [imageFile, setImageFile] = reactExports.useState(null);
   const [imagePreview, setImagePreview] = reactExports.useState(null);
@@ -68387,12 +68399,15 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [showExportModal, setShowExportModal] = reactExports.useState(false);
   const [includeExportPhotos, setIncludeExportPhotos] = reactExports.useState(true);
   const [deliveryExportColumns, setDeliveryExportColumns] = reactExports.useState([
-    "Item / Recipient",
-    "Sender / Company",
-    "Carrier / Reg",
-    "Received",
-    "Status",
-    "Photo"
+    "Name",
+    "Site / Project",
+    "Date / Time",
+    "Supplier",
+    "Vehicle Reg",
+    "Delivery Document Number",
+    "Product",
+    "Net Weight",
+    "Image"
   ]);
   const fileInputRef = React.useRef(null);
   const API_BASE = "";
@@ -68405,18 +68420,21 @@ const DeliveriesTab = ({ siteId, siteName }) => {
     const printWin = window.open("", "_blank");
     if (!printWin) return;
     const deliveryFields = {
-      "Item / Recipient": (d2) => d2.recipient || d2.itemName || "—",
-      "Sender / Company": (d2) => d2.sender || d2.company || "—",
-      "Carrier / Reg": (d2) => d2.carrier || d2.carRegistration || "—",
-      Received: (d2) => d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB") : "—",
-      Status: (d2) => d2.collected ? "Collected" : "Pending"
+      Name: (d2) => d2.recipient || "—",
+      "Site / Project": () => siteName || "—",
+      "Date / Time": (d2) => new Date(d2.receivedAt || d2.createdAt).toLocaleString("en-GB"),
+      Supplier: (d2) => d2.supplier || d2.sender || d2.company || "—",
+      "Vehicle Reg": (d2) => d2.carRegistration || "—",
+      "Delivery Document Number": (d2) => d2.deliveryDocumentNumber || "—",
+      Product: (d2) => d2.product || d2.itemName || "—",
+      "Net Weight": (d2) => d2.netWeight || "—"
     };
-    const tableColumns = deliveryExportColumns.filter((c2) => c2 !== "Photo");
+    const tableColumns = deliveryExportColumns.filter((c2) => c2 !== "Image");
     const rowsHtml = filtered.map((d2) => `<tr>${tableColumns.map(
       (c2) => `<td style="padding:8px;border:1px solid #e2e8f0;">${deliveryFields[c2](d2)}</td>`
     ).join("")}</tr>`).join("");
     let picsHtml = "";
-    if (includeExportPhotos && deliveryExportColumns.includes("Photo")) {
+    if (includeExportPhotos && deliveryExportColumns.includes("Image")) {
       const withPics = filtered.filter((d2) => d2.deliveryImageUrl);
       if (withPics.length > 0) {
         picsHtml = `
@@ -68438,11 +68456,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       <html>
         <head>
           <title>Delivery Report - ${siteName || "Site"}</title>
-          <style>body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; }</style>
+          <style>body { font-family: Arial, sans-serif; padding: 28px; color: #1e293b; }.report-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #2b4594;padding-bottom:14px}.report-head img{height:46px;max-width:170px;object-fit:contain}</style>
         </head>
         <body>
-          <h2>Delivery Report — ${siteName || "Site"}</h2>
-          <p style="color:#64748b;font-size:13px">Generated on ${(/* @__PURE__ */ new Date()).toLocaleString("en-GB")}</p>
+          <div class="report-head"><img src="${API_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services"/><div><h2 style="margin:0">Delivery Report</h2><p style="margin:5px 0 0;color:#64748b;font-size:13px">${siteName || "Site"} · Generated ${(/* @__PURE__ */ new Date()).toLocaleString("en-GB")}</p></div></div>
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
             <thead>
               <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
@@ -68461,12 +68478,15 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const handleDeliveryExcelExport = () => {
     if (!deliveryExportColumns.length) return zt$1.error("Select at least one column to export");
     const values = {
-      "Item / Recipient": (d2) => d2.recipient || d2.itemName || "",
-      "Sender / Company": (d2) => d2.sender || d2.company || "",
-      "Carrier / Reg": (d2) => d2.carrier || d2.carRegistration || "",
-      Received: (d2) => d2.createdAt ? new Date(d2.createdAt).toLocaleString("en-GB") : "",
-      Status: (d2) => d2.collected ? "Collected" : "Pending",
-      Photo: (d2) => d2.deliveryImageUrl ? "Included" : ""
+      Name: (d2) => d2.recipient || "",
+      "Site / Project": () => siteName || "",
+      "Date / Time": (d2) => d2.receivedAt ? new Date(d2.receivedAt).toLocaleString("en-GB") : "",
+      Supplier: (d2) => d2.supplier || d2.sender || d2.company || "",
+      "Vehicle Reg": (d2) => d2.carRegistration || "",
+      "Delivery Document Number": (d2) => d2.deliveryDocumentNumber || "",
+      Product: (d2) => d2.product || d2.itemName || "",
+      "Net Weight": (d2) => d2.netWeight || "",
+      Image: (d2) => d2.deliveryImageUrl ? "Included" : ""
     };
     const rows = filtered.map((delivery) => Object.fromEntries(deliveryExportColumns.map((column) => [column, values[column](delivery)])));
     downloadWorkbook(rows, `${(siteName || "site").replace(/[^a-z0-9-_]+/gi, "-").toLowerCase()}-deliveries-export.xlsx`, "Deliveries");
@@ -68511,21 +68531,18 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   };
   const resetModal = () => {
     setShowModal(false);
-    setForm({ recipient: "", sender: "", carrier: "", notes: "" });
+    setForm({ name: "", supplier: "", car_registration: "", delivery_document_number: "", product: "", net_weight: "", notes: "" });
     removeImage();
   };
   const handleCreate = async (e2) => {
     e2.preventDefault();
-    if (!form.recipient.trim()) return;
+    if (!form.name.trim() || !form.supplier.trim() || !form.product.trim()) return;
     setSaving(true);
     try {
       if (imageFile) {
         const fd = new FormData();
         fd.append("site_id", siteId);
-        fd.append("recipient", form.recipient);
-        fd.append("sender", form.sender);
-        fd.append("carrier", form.carrier);
-        fd.append("notes", form.notes);
+        Object.entries(form).forEach(([key, value2]) => fd.append(key, value2));
         fd.append("delivery_image", imageFile, imageFile.name);
         await api.post("/deliveries", fd, { headers: { "Content-Type": "multipart/form-data" } });
       } else {
@@ -68669,42 +68686,64 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs("form", { onSubmit: handleCreate, className: "space-y-4 p-6", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Recipient *" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Name *" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "input",
             {
-              value: form.recipient,
-              onChange: (e2) => setForm((f2) => ({ ...f2, recipient: e2.target.value })),
+              value: form.name,
+              onChange: (e2) => setForm((f2) => ({ ...f2, name: e2.target.value })),
               required: true,
               className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
             }
           )
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Sender" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Site / Project" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { value: siteName || "Current site", disabled: true, className: "w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Supplier *" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "input",
             {
-              value: form.sender,
-              onChange: (e2) => setForm((f2) => ({ ...f2, sender: e2.target.value })),
+              value: form.supplier,
+              onChange: (e2) => setForm((f2) => ({ ...f2, supplier: e2.target.value })),
+              required: true,
               className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
             }
           )
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Carrier" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Vehicle Reg" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "input",
             {
-              value: form.carrier,
-              onChange: (e2) => setForm((f2) => ({ ...f2, carrier: e2.target.value })),
-              placeholder: "e.g. Royal Mail, DHL",
+              value: form.car_registration,
+              onChange: (e2) => setForm((f2) => ({ ...f2, car_registration: e2.target.value })),
               className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
             }
           )
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Notes" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: [
+            "Delivery Document Number ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { value: form.delivery_document_number, onChange: (e2) => setForm((f2) => ({ ...f2, delivery_document_number: e2.target.value })), className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Product *" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { value: form.product, onChange: (e2) => setForm((f2) => ({ ...f2, product: e2.target.value })), required: true, className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: [
+            "Net Weight ",
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal", children: "(Optional)" })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("input", { value: form.net_weight, onChange: (e2) => setForm((f2) => ({ ...f2, net_weight: e2.target.value })), className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: "Description" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
             "textarea",
             {
@@ -68827,9 +68866,9 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-5", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between mb-2", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-slate-800", children: "Columns to include" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: () => setDeliveryExportColumns(["Item / Recipient", "Sender / Company", "Carrier / Reg", "Received", "Status", "Photo"]), className: "text-xs font-semibold text-[#2b4594] hover:underline", children: "Select all" })
+          /* @__PURE__ */ jsxRuntimeExports.jsx("button", { type: "button", onClick: () => setDeliveryExportColumns(["Name", "Site / Project", "Date / Time", "Supplier", "Vehicle Reg", "Delivery Document Number", "Product", "Net Weight", "Image"]), className: "text-xs font-semibold text-[#2b4594] hover:underline", children: "Select all" })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: ["Item / Recipient", "Sender / Company", "Carrier / Reg", "Received", "Status", "Photo"].map((column) => /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center gap-2 text-sm text-slate-700", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 gap-2", children: ["Name", "Site / Project", "Date / Time", "Supplier", "Vehicle Reg", "Delivery Document Number", "Product", "Net Weight", "Image"].map((column) => /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "flex items-center gap-2 text-sm text-slate-700", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("input", { type: "checkbox", checked: deliveryExportColumns.includes(column), onChange: () => setDeliveryExportColumns((current) => current.includes(column) ? current.filter((c2) => c2 !== column) : [...current, column]), className: "w-4 h-4 accent-[#2b4594]" }),
           column
         ] }, column)) })

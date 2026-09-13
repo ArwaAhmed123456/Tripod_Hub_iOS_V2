@@ -112,13 +112,12 @@ export default function DeliveriesScreen({ navigation, route }) {
       const rows = reportItems
         .map(
           (d) => `<tr>
-            <td>${esc(d.itemName || d.item_name || '—')}</td>
-            <td>${esc(d.company || '—')}</td>
-            <td>${esc(d.description || d.notes || '—')}</td>
-            <td>${esc(d.carRegistration || d.car_registration || '—')}</td>
+            <td>${esc(d.recipient || '—')}</td><td>${esc(siteId || '—')}</td>
             <td>${esc(formatDate(d.receivedAt || d.createdAt))}</td>
-            <td>${d.collected ? 'Collected' : 'Pending collection'}</td>
-            <td>${d.collected ? esc(formatDate(d.collectedAt)) : '—'}</td>
+            <td>${esc(d.supplier || d.sender || d.company || '—')}</td>
+            <td>${esc(d.carRegistration || d.car_registration || '—')}</td>
+            <td>${esc(d.deliveryDocumentNumber || '—')}</td>
+            <td>${esc(d.product || d.itemName || '—')}</td><td>${esc(d.netWeight || '—')}</td>
           </tr>`,
         )
         .join('');
@@ -150,12 +149,11 @@ export default function DeliveriesScreen({ navigation, route }) {
       }
 
       const html = `<html><body style="font-family:Arial;padding:24px;color:#111827">
-        <h2>${esc(reportTitle)}</h2>
+        <div style="display:flex;align-items:center;gap:14px;border-bottom:3px solid #2b4594;padding-bottom:12px"><img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" style="height:44px;max-width:150px;object-fit:contain" /><div><h2 style="margin:0">${esc(reportTitle)}</h2><p style="margin:4px 0;color:#64748b">Generated ${esc(new Date().toLocaleString('en-GB'))}</p></div></div>
         <p>Period: ${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}</p>
         <table style="width:100%;border-collapse:collapse" border="1" cellpadding="7">
           <thead><tr style="background:#f8fafc;font-weight:bold">
-            <th>Item Name</th><th>Company</th><th>Description</th>
-            <th>Vehicle Reg.</th><th>Received</th><th>Status</th><th>Collected At</th>
+            <th>Name</th><th>Site / Project</th><th>Date / Time</th><th>Supplier</th><th>Vehicle Reg</th><th>Delivery Document Number</th><th>Product</th><th>Net Weight</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>

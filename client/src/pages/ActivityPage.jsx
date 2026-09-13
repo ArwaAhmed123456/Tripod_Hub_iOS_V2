@@ -111,8 +111,17 @@ const downloadWorkbook = (rows, filename, sheetName) => {
 
 const VISIT_EXPORT_FIELDS = [
   { id: 'Name', value: (visit) => visit.name || '' },
+  { id: 'Date', value: (visit) => formatDateTime(visit.sign_in_time || visit.created_at).split(',')[0] || '' },
+  { id: 'Time In', value: (visit) => formatDateTime(visit.sign_in_time) },
+  { id: 'Time Out', value: (visit) => formatDateTime(visit.sign_out_time) },
+  { id: 'Role', value: (visit) => visit.group || visit.user_type || '' },
   { id: 'Company', value: (visit) => visit.trade || visit.company || '' },
   { id: 'Employee Company Name', value: (visit) => visit.employee_company_name || '' },
+  { id: 'Expected Arrival', value: (visit) => formatDateTime(visit.expected_date || visit.expectedArrival) },
+  { id: 'Description', value: (visit) => visit.description || visit.reason || '' },
+  { id: 'Purpose of Visit', value: (visit) => visit.reason || '' },
+  { id: 'Hrs', value: (visit) => String(visit.hours ?? '').replace(/\.\d+$/, '') },
+  { id: 'Mins', value: (visit) => String(Math.round((Number(visit.hours || 0) % 1) * 60) || '') },
   { id: 'Site', value: (visit) => visit.site || '' },
   { id: 'Group', value: (visit) => visit.group || '' },
   { id: 'In time', value: (visit) => formatDateTime(visit.sign_in_time) },
@@ -148,11 +157,7 @@ const StatCard = ({ label, value }) => (
 const ExportModal = ({ visits, groups, siteName, onClose }) => {
   const [selectedGroup, setSelectedGroup] = useState('All');
   const [selectedFields, setSelectedFields] = useState([
-    'Name',
-    'Site',
-    'Group',
-    'In time',
-    'Out time',
+    'Name', 'Date', 'Time In', 'Time Out', 'Role', 'Company', 'Hrs', 'Mins',
   ]);
 
   const groupedVisits = useMemo(() => {
@@ -1453,7 +1458,7 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [includeExportPhotos, setIncludeExportPhotos] = useState(true);
   const [deliveryExportColumns, setDeliveryExportColumns] = useState([
-    'Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo',
+    'Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image',
   ]);
   const fileInputRef = React.useRef(null);
 
@@ -1468,19 +1473,22 @@ const DeliveriesTab = ({ siteId, siteName }) => {
     const printWin = window.open('', '_blank');
     if (!printWin) return;
     const deliveryFields = {
-      'Item / Recipient': d => d.recipient || d.itemName || '—',
-      'Sender / Company': d => d.sender || d.company || '—',
-      'Carrier / Reg': d => d.carrier || d.carRegistration || '—',
-      Received: d => d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '—',
-      Status: d => d.collected ? 'Collected' : 'Pending',
+      Name: d => d.recipient || '—',
+      'Site / Project': () => siteName || '—',
+      'Date / Time': d => new Date(d.receivedAt || d.createdAt).toLocaleString('en-GB'),
+      Supplier: d => d.supplier || d.sender || d.company || '—',
+      'Vehicle Reg': d => d.carRegistration || '—',
+      'Delivery Document Number': d => d.deliveryDocumentNumber || '—',
+      Product: d => d.product || d.itemName || '—',
+      'Net Weight': d => d.netWeight || '—',
     };
-    const tableColumns = deliveryExportColumns.filter(c => c !== 'Photo');
+    const tableColumns = deliveryExportColumns.filter(c => c !== 'Image');
     const rowsHtml = filtered.map(d => `<tr>${tableColumns.map(c =>
       `<td style="padding:8px;border:1px solid #e2e8f0;">${deliveryFields[c](d)}</td>`
     ).join('')}</tr>`).join('');
 
     let picsHtml = '';
-    if (includeExportPhotos && deliveryExportColumns.includes('Photo')) {
+    if (includeExportPhotos && deliveryExportColumns.includes('Image')) {
       const withPics = filtered.filter(d => d.deliveryImageUrl);
       if (withPics.length > 0) {
         picsHtml = `
@@ -1503,11 +1511,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       <html>
         <head>
           <title>Delivery Report - ${siteName || 'Site'}</title>
-          <style>body { font-family: Arial, sans-serif; padding: 24px; color: #1e293b; }</style>
+          <style>body { font-family: Arial, sans-serif; padding: 28px; color: #1e293b; }.report-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #2b4594;padding-bottom:14px}.report-head img{height:46px;max-width:170px;object-fit:contain}</style>
         </head>
         <body>
-          <h2>Delivery Report — ${siteName || 'Site'}</h2>
-          <p style="color:#64748b;font-size:13px">Generated on ${new Date().toLocaleString('en-GB')}</p>
+          <div class="report-head"><img src="${API_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services"/><div><h2 style="margin:0">Delivery Report</h2><p style="margin:5px 0 0;color:#64748b;font-size:13px">${siteName || 'Site'} · Generated ${new Date().toLocaleString('en-GB')}</p></div></div>
           <table style="width:100%;border-collapse:collapse;margin-top:16px;">
             <thead>
               <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
@@ -1527,12 +1534,13 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const handleDeliveryExcelExport = () => {
     if (!deliveryExportColumns.length) return toast.error('Select at least one column to export');
     const values = {
-      'Item / Recipient': d => d.recipient || d.itemName || '',
-      'Sender / Company': d => d.sender || d.company || '',
-      'Carrier / Reg': d => d.carrier || d.carRegistration || '',
-      Received: d => d.createdAt ? new Date(d.createdAt).toLocaleString('en-GB') : '',
-      Status: d => d.collected ? 'Collected' : 'Pending',
-      Photo: d => d.deliveryImageUrl ? 'Included' : '',
+      Name: d => d.recipient || '', 'Site / Project': () => siteName || '',
+      'Date / Time': d => d.receivedAt ? new Date(d.receivedAt).toLocaleString('en-GB') : '',
+      Supplier: d => d.supplier || d.sender || d.company || '',
+      'Vehicle Reg': d => d.carRegistration || '',
+      'Delivery Document Number': d => d.deliveryDocumentNumber || '',
+      Product: d => d.product || d.itemName || '', 'Net Weight': d => d.netWeight || '',
+      Image: d => d.deliveryImageUrl ? 'Included' : '',
     };
     const rows = filtered.map(delivery => Object.fromEntries(deliveryExportColumns.map(column => [column, values[column](delivery)])));
     downloadWorkbook(rows, `${(siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()}-deliveries-export.xlsx`, 'Deliveries');
@@ -1747,22 +1755,38 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             </div>
             <form onSubmit={handleCreate} className="space-y-4 p-6">
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Recipient *</label>
-                <input value={form.recipient} onChange={e => setForm(f => ({ ...f, recipient: e.target.value }))} required
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Name *</label>
+                <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Sender</label>
-                <input value={form.sender} onChange={e => setForm(f => ({ ...f, sender: e.target.value }))}
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Site / Project</label>
+                <input value={siteName || 'Current site'} disabled className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Supplier *</label>
+                <input value={form.supplier} onChange={e => setForm(f => ({ ...f, supplier: e.target.value }))} required
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Carrier</label>
-                <input value={form.carrier} onChange={e => setForm(f => ({ ...f, carrier: e.target.value }))} placeholder="e.g. Royal Mail, DHL"
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Vehicle Reg</label>
+                <input value={form.car_registration} onChange={e => setForm(f => ({ ...f, car_registration: e.target.value }))}
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]" />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-semibold text-slate-700">Notes</label>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Delivery Document Number <span className="text-slate-400 font-normal">(Optional)</span></label>
+                <input value={form.delivery_document_number} onChange={e => setForm(f => ({ ...f, delivery_document_number: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Product *</label>
+                <input value={form.product} onChange={e => setForm(f => ({ ...f, product: e.target.value }))} required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Net Weight <span className="text-slate-400 font-normal">(Optional)</span></label>
+                <input value={form.net_weight} onChange={e => setForm(f => ({ ...f, net_weight: e.target.value }))} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-slate-700">Description</label>
                 <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                   className="w-full resize-none rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]" />
               </div>
@@ -1857,10 +1881,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold text-slate-800">Columns to include</p>
-                <button type="button" onClick={() => setDeliveryExportColumns(['Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo'])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all</button>
+                <button type="button" onClick={() => setDeliveryExportColumns(['Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {['Item / Recipient', 'Sender / Company', 'Carrier / Reg', 'Received', 'Status', 'Photo'].map(column => (
+                {['Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'].map(column => (
                   <label key={column} className="flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" checked={deliveryExportColumns.includes(column)} onChange={() => setDeliveryExportColumns(current => current.includes(column) ? current.filter(c => c !== column) : [...current, column])} className="w-4 h-4 accent-[#2b4594]" />
                     {column}

@@ -281,9 +281,9 @@ const PersonDetailsModal = ({ visible, onClose, person }) => {
   );
 };
 
-const ManagerScreen = ({ navigation }) => {
+const ManagerScreen = ({ navigation, route }) => {
   const { user, logout } = useAuth();
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeTab, setActiveTab] = useState(route?.params?.initialTab || 'Overview');
   const [sites, setSites] = useState([]);
   const [selectedSite, setSelectedSite] = useState(null);
   const [siteOpen, setSiteOpen] = useState(false);

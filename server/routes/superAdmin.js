@@ -27,7 +27,7 @@ const verifySuperAdmin = async (req, res, next) => {
 
     // Look up in Admin collection
     const admin = await Admin.findById(decoded.id || decoded.userId);
-    if (!admin || admin.role !== 'superadmin') {
+    if (!admin || String(admin.role || '').toLowerCase() !== 'superadmin') {
       return res.status(403).json({ error: 'Access denied: Super Admin role required' });
     }
 

@@ -5,8 +5,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ActivityIndicator, View, Platform, KeyboardAvoidingView } from 'react-native';
+import api from './src/services/api';
 
-import { CheckCircle, Calendar as CalendarIcon, ShieldCheck, AlertTriangle, User, Users, MessageCircle } from 'lucide-react-native';
+import { CheckCircle, Calendar as CalendarIcon, ShieldCheck, AlertTriangle, User, Users, MessageCircle, Video } from 'lucide-react-native';
 
 // Companion screens
 import TodayScreen        from './src/screens/TodayScreen';
@@ -76,9 +77,14 @@ const EmployeeTabs = () => {
 // ── Manager tab navigator ────────────────────────────────────────────────────
 const ManagerTabs = () => {
   const tabStyle = useTabStyle();
+  const [canViewCameras, setCanViewCameras] = React.useState(false);
+  React.useEffect(() => {
+    api.get('/cameras/access').then(res => setCanViewCameras(Boolean(res.data?.can_view_cameras))).catch(() => setCanViewCameras(false));
+  }, []);
   return (
     <Tab.Navigator screenOptions={tabStyle}>
       <Tab.Screen name="ManagerHome"  component={ManagerScreen}    options={{ tabBarLabel: 'Portal', tabBarIcon: ({ color }) => <Users          color={color} size={22} /> }} />
+      {canViewCameras && <Tab.Screen name="Cameras" component={ManagerScreen} initialParams={{ initialTab: 'Cameras' }} options={{ tabBarLabel: 'Cameras', tabBarIcon: ({ color }) => <Video color={color} size={22} /> }} />}
       <Tab.Screen name="Messages"     component={MessagesScreen}   options={{ tabBarLabel: 'Messages', tabBarIcon: ({ color }) => <MessageCircle  color={color} size={22} /> }} />
       <Tab.Screen name="EvacuationTab"component={EvacuationScreen} options={{ tabBarLabel: 'Evacuation', tabBarIcon: ({ color }) => <ShieldCheck    color={color} size={22} /> }} />
       <Tab.Screen name="Profile"      component={ProfileScreen}    options={{ tabBarLabel: 'Profile', tabBarIcon: ({ color }) => <User           color={color} size={22} /> }} />
