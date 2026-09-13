@@ -3,6 +3,8 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,7 +21,11 @@ import api from '../services/api';
 
 const DeliveryFormScreen = ({ navigation, route }) => {
   const { user } = useAuth();
-  const [itemName, setItemName] = useState('');
+  const [name, setName] = useState('');
+  const [supplier, setSupplier] = useState('');
+  const [product, setProduct] = useState('');
+  const [deliveryDocumentNumber, setDeliveryDocumentNumber] = useState('');
+  const [netWeight, setNetWeight] = useState('');
   const [description, setDescription] = useState('');
   const [carRegistration, setCarRegistration] = useState('');
   const [company, setCompany] = useState('');
@@ -104,8 +110,8 @@ const DeliveryFormScreen = ({ navigation, route }) => {
 
   // ── Save delivery ──────────────────────────────────────────────────────────
   const save = async () => {
-    if (!itemName.trim() || !company.trim()) {
-      Alert.alert('Required fields', 'Please enter the item name and company.');
+    if (!name.trim() || !supplier.trim() || !product.trim()) {
+      Alert.alert('Required fields', 'Please enter Name, Supplier, and Product.');
       return;
     }
     setSaving(true);
@@ -114,10 +120,15 @@ const DeliveryFormScreen = ({ navigation, route }) => {
         // Multipart form upload when image is attached
         const fd = new FormData();
         fd.append('site_id', route?.params?.siteId || user?.project_id || user?.site_id);
-        fd.append('item_name', itemName.trim());
+        fd.append('name', name.trim());
+        fd.append('supplier', supplier.trim());
+        fd.append('product', product.trim());
+        fd.append('delivery_document_number', deliveryDocumentNumber.trim());
+        fd.append('net_weight', netWeight.trim());
+        fd.append('item_name', product.trim());
         fd.append('description', description.trim());
         fd.append('car_registration', carRegistration.trim());
-        fd.append('company', company.trim());
+        fd.append('company', supplier.trim());
         fd.append('received_at', receivedAt.toISOString());
         fd.append('delivery_image', {
           uri: deliveryImage.uri,
@@ -130,10 +141,15 @@ const DeliveryFormScreen = ({ navigation, route }) => {
       } else {
         await api.post('/deliveries', {
           site_id: route?.params?.siteId || user?.project_id || user?.site_id,
-          item_name: itemName.trim(),
+          name: name.trim(),
+          supplier: supplier.trim(),
+          product: product.trim(),
+          delivery_document_number: deliveryDocumentNumber.trim(),
+          net_weight: netWeight.trim(),
+          item_name: product.trim(),
           description: description.trim(),
           car_registration: carRegistration.trim(),
-          company: company.trim(),
+          company: supplier.trim(),
           received_at: receivedAt.toISOString(),
         });
       }
@@ -150,6 +166,7 @@ const DeliveryFormScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={s.container} edges={['top']}>
+      <KeyboardAvoidingView style={s.keyboard} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <View style={s.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <ArrowLeft size={24} color="#111827" />
@@ -158,22 +175,16 @@ const DeliveryFormScreen = ({ navigation, route }) => {
         <Text style={s.title}>Record delivery</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.form}>
+      <ScrollView contentContainerStyle={s.form} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         <Text style={s.intro}>Record delivery details for this site.</Text>
 
-        <Text style={s.label}>Item name *</Text>
-        <TextInput value={itemName} onChangeText={setItemName} style={s.input} placeholder="Item name" />
+        <Text style={s.label}>Name *</Text>
+        <TextInput value={name} onChangeText={setName} style={s.input} placeholder="Driver or contact name" />
 
-        <Text style={s.label}>Description</Text>
-        <TextInput value={description} onChangeText={setDescription} style={[s.input, s.description]} placeholder="Item description" multiline />
+        <Text style={s.label}>Site / Project</Text>
+        <TextInput value={user?.siteName || user?.project_name || 'Assigned site'} editable={false} style={[s.input, s.readOnly]} />
 
-        <Text style={s.label}>Car registration number</Text>
-        <TextInput value={carRegistration} onChangeText={setCarRegistration} style={s.input} placeholder="Car registration number" autoCapitalize="characters" />
-
-        <Text style={s.label}>Company *</Text>
-        <TextInput value={company} onChangeText={setCompany} style={s.input} placeholder="Company name" />
-
-        <Text style={s.label}>Delivery Date and Time</Text>
+        <Text style={s.label}>Date / Time</Text>
         <View style={s.dateRow}>
           <TouchableOpacity onPress={() => setPickerMode('date')} style={s.dateBtn}>
             <Calendar size={18} color="#2b4594" />
@@ -196,10 +207,30 @@ const DeliveryFormScreen = ({ navigation, route }) => {
           />
         ) : null}
 
+        <Text style={s.label}>Supplier *</Text>
+        <TextInput value={supplier} onChangeText={setSupplier} style={s.input} placeholder="Supplier name" />
+
+        <Text style={s.label}>Vehicle Reg</Text>
+        <TextInput value={carRegistration} onChangeText={setCarRegistration} style={s.input} placeholder="Car registration number" autoCapitalize="characters" />
+
+        <Text style={s.label}>Delivery Document Number <Text style={s.labelOptional}>(Optional)</Text></Text>
+        <TextInput value={deliveryDocumentNumber} onChangeText={setDeliveryDocumentNumber} style={s.input} placeholder="Document or reference number" />
+
+        <Text style={s.label}>Product *</Text>
+        <TextInput value={product} onChangeText={setProduct} style={s.input} placeholder="Product or cargo" />
+
+        <Text style={s.label}>Net Weight <Text style={s.labelOptional}>(Optional)</Text></Text>
+        <TextInput value={netWeight} onChangeText={setNetWeight} style={s.input} placeholder="e.g. 1,250 kg" />
+
+        <Text style={s.label}>Description</Text>
+        <TextInput value={description} onChangeText={setDescription} style={[s.input, s.description]} placeholder="Additional details" multiline />
+
+        <Text style={s.label}>Image <Text style={s.labelOptional}>(Optional)</Text></Text>
+
         {/* ── Delivery Picture section ──────────────────────────────────── */}
         <View style={s.photoSection}>
           <Text style={s.label}>
-            Delivery Picture <Text style={s.labelOptional}>(Optional)</Text>
+            Attach vehicle or delivery image
           </Text>
 
           {deliveryImage ? (
@@ -229,12 +260,14 @@ const DeliveryFormScreen = ({ navigation, route }) => {
           {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.buttonText}>Record delivery</Text>}
         </TouchableOpacity>
       </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
+  keyboard: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e5e7eb' },
   title: { fontSize: 18, fontWeight: '700', color: '#111827' },
   form: { padding: 20 },
@@ -242,6 +275,7 @@ const s = StyleSheet.create({
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 7 },
   labelOptional: { fontSize: 12, fontWeight: '400', color: '#9ca3af' },
   input: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 12, padding: 13, fontSize: 15, marginBottom: 16 },
+  readOnly: { color: '#64748b', backgroundColor: '#f1f5f9' },
   description: { minHeight: 90, textAlignVertical: 'top' },
   dateRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   dateBtn: { flex: 1, backgroundColor: '#fff', borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 12, padding: 12 },

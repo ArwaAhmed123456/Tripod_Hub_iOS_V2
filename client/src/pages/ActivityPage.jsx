@@ -1445,7 +1445,7 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ recipient: '', sender: '', carrier: '', notes: '' });
+  const [form, setForm] = useState({ name: '', supplier: '', car_registration: '', delivery_document_number: '', product: '', net_weight: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState(null);   // raw File from picker
   const [imagePreview, setImagePreview] = useState(null); // object URL for <img>
@@ -1578,23 +1578,20 @@ const DeliveriesTab = ({ siteId, siteName }) => {
 
   const resetModal = () => {
     setShowModal(false);
-    setForm({ recipient: '', sender: '', carrier: '', notes: '' });
+    setForm({ name: '', supplier: '', car_registration: '', delivery_document_number: '', product: '', net_weight: '', notes: '' });
     removeImage();
   };
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if (!form.recipient.trim()) return;
+    if (!form.name.trim() || !form.supplier.trim() || !form.product.trim()) return;
     setSaving(true);
     try {
       if (imageFile) {
         // Multipart upload with image
         const fd = new FormData();
         fd.append('site_id', siteId);
-        fd.append('recipient', form.recipient);
-        fd.append('sender', form.sender);
-        fd.append('carrier', form.carrier);
-        fd.append('notes', form.notes);
+        Object.entries(form).forEach(([key, value]) => fd.append(key, value));
         fd.append('delivery_image', imageFile, imageFile.name);
         await api.post('/deliveries', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       } else {

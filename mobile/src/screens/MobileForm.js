@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, Image, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Modal, ActivityIndicator, Alert, Image, Platform, KeyboardAvoidingView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock, User, Briefcase, Car, Calendar, ArrowLeft, CheckCircle, AlertCircle, Lock, LogOut, Camera, Trash2 } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -274,6 +274,7 @@ const MobileForm = ({ navigation }) => {
 
     return (
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f8fafc' }}>
+          <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
             <StyledView className="bg-white border-b border-gray-100 px-4 py-3 flex-row items-center justify-between shadow-sm">
                 <StyledView className="flex-row items-center">
                     <StyledTouchableOpacity onPress={() => navigation.goBack()} className="p-2 mr-1">
@@ -308,7 +309,7 @@ const MobileForm = ({ navigation }) => {
                 </StyledView>
             </StyledView>
 
-            <StyledScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false}>
+            <StyledScrollView className="flex-1 p-4" showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 48 }}>
                 {error && (
                     <StyledView className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r flex-row">
                         <AlertCircle size={20} color="#ef4444" />
@@ -544,6 +545,7 @@ const MobileForm = ({ navigation }) => {
                     </StyledView>
                 </StyledView>
             </Modal>
+          </KeyboardAvoidingView>
         </SafeAreaView>
     );
 };

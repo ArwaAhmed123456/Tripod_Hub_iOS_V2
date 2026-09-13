@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   RefreshControl,
@@ -136,6 +137,7 @@ const CheckInModal = ({
   const [notes, setNotes] = useState('');
   const [carRegistration, setCarRegistration] = useState('');
   const [companyName, setCompanyName] = useState('');
+  const [employeeCompanyName, setEmployeeCompanyName] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -143,13 +145,14 @@ const CheckInModal = ({
       setNotes('');
       setCarRegistration('');
       setCompanyName('');
+      setEmployeeCompanyName('');
       setGroup(defaultGroup || 'Visitor');
     }
   }, [visible, defaultGroup, visitorGroups]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={s.modalOverlay}>
+      <KeyboardAvoidingView style={s.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={s.modalCard}>
           <Text style={s.modalTitle}>Sign in person</Text>
           <Text style={s.modalBody}>Enter the person’s name, choose their group, then sign them in.</Text>
@@ -163,7 +166,7 @@ const CheckInModal = ({
           />
 
           <ScrollView keyboardShouldPersistTaps="handled" horizontal showsHorizontalScrollIndicator={false} style={s.groupPicker}>
-            {['Visitor', 'Worker', 'Contractor'].map((groupName) => {
+            {['Visitor', 'Worker', 'Contractor', 'Employee'].map((groupName) => {
               const active = group === groupName;
               return (
                 <TouchableOpacity
@@ -178,7 +181,11 @@ const CheckInModal = ({
           </ScrollView>
 
           <TextInput value={carRegistration} onChangeText={setCarRegistration} placeholder="Car registration number" placeholderTextColor="#9ca3af" style={s.input} autoCapitalize="characters" />
-          <TextInput value={companyName} onChangeText={setCompanyName} placeholder="Company name" placeholderTextColor="#9ca3af" style={s.input} />
+          {group === 'Employee' ? (
+            <TextInput value={employeeCompanyName} onChangeText={setEmployeeCompanyName} placeholder="Employee Company Name (optional)" placeholderTextColor="#9ca3af" style={s.input} />
+          ) : (
+            <TextInput value={companyName} onChangeText={setCompanyName} placeholder={`${group} Company Name (optional)`} placeholderTextColor="#9ca3af" style={s.input} />
+          )}
 
           <TextInput
             value={notes}
@@ -199,7 +206,7 @@ const CheckInModal = ({
                   Alert.alert('Name required', 'Please enter the visitor or staff name.');
                   return;
                 }
-                onSubmit({ name: name.trim(), group, notes: notes.trim(), carRegistration: carRegistration.trim(), companyName: companyName.trim() });
+                onSubmit({ name: name.trim(), group, notes: notes.trim(), carRegistration: carRegistration.trim(), companyName: companyName.trim(), employeeCompanyName: employeeCompanyName.trim() });
               }}
               disabled={loading}
               style={s.modalConfirmBtn}
@@ -208,7 +215,7 @@ const CheckInModal = ({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
@@ -413,7 +420,7 @@ const SecurityGuardScreen = ({ navigation }) => {
     }
   };
 
-  const handleCheckIn = async ({ name, group, notes, carRegistration, companyName }) => {
+  const handleCheckIn = async ({ name, group, notes, carRegistration, companyName, employeeCompanyName }) => {
     if (!selectedSite?.id) {
       Alert.alert('Site required', 'Please select a site before signing someone in.');
       return;
@@ -428,6 +435,7 @@ const SecurityGuardScreen = ({ navigation }) => {
         notes,
         carRegistration,
         companyName,
+        employeeCompanyName,
       });
       setCheckInOpen(false);
       await loadSiteData(selectedSite.id);

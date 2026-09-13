@@ -85,8 +85,10 @@ router.post('/', verifyToken, (req, res) => {
   uploadDeliveryImage(req, res, async (uploadErr) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
 
-    const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at } = req.body;
-    if (!recipient && !item_name) return res.status(400).json({ error: 'item_name is required' });
+    const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at,
+      name, supplier, delivery_document_number, product, net_weight } = req.body;
+    const deliveryName = name || recipient || item_name;
+    if (!deliveryName) return res.status(400).json({ error: 'name is required' });
 
     try {
       let siteId = site_id;
@@ -104,11 +106,17 @@ router.post('/', verifyToken, (req, res) => {
 
       const delivery = await Delivery.create({
         siteId,
-        recipient: recipient || item_name,
-        sender: sender || '', carrier: carrier || '', notes: notes || description || '',
-        itemName: item_name || '', description: description || '',
+        // Keep both representations in sync while clients transition to the
+        // agreed Cargo form terminology.
+        recipient: deliveryName,
+        sender: sender || supplier || '', carrier: carrier || '', notes: notes || description || '',
+        itemName: item_name || product || '', description: description || '',
         carRegistration: car_registration || '', company: company || '', receivedAt,
         deliveryImageUrl,
+        supplier: supplier || sender || '',
+        deliveryDocumentNumber: delivery_document_number || '',
+        product: product || item_name || '',
+        netWeight: net_weight || '',
       });
 
       res.status(201).json({ success: true, delivery });
