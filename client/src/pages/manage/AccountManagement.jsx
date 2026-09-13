@@ -1174,66 +1174,29 @@ const AccountManagement = () => {
     </div>
   );
 
-  // Audit log
+  // Audit log: the real, searchable audit trail is restricted to Super Admins.
   if (activeSection === 'audit') return (
     <div className="max-w-3xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => setActiveSection('overview')} className="text-sm text-[#2b4594] hover:underline">← Account management</button>
       </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Audit log</h1>
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            <tr>
-              <th className="px-5 py-3 text-left">Time</th>
-              <th className="px-5 py-3 text-left">User</th>
-              <th className="px-5 py-3 text-left">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {[
-              ['Today 14:32', 'admin@signinapp.com', 'Updated site settings for Tripod'],
-              ['Today 12:10', 'admin@signinapp.com', 'Added member: Arwa Ahmed'],
-              ['Today 09:05', 'test@tripod.com',     'Started evacuation at My remote site'],
-              ['Yesterday',   'admin@signinapp.com', 'Exported attendance report'],
-              ['3 Jul 2026',  'admin@signinapp.com', 'Created visitor group: Deliveries'],
-            ].map(([time, user, action], i) => (
-              <tr key={i} className="hover:bg-slate-50">
-                <td className="px-5 py-3 text-slate-400 text-xs whitespace-nowrap">{time}</td>
-                <td className="px-5 py-3 text-slate-600 text-xs">{user}</td>
-                <td className="px-5 py-3 text-slate-800 text-sm">{action}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="bg-white rounded-xl border border-slate-200 p-6 text-sm text-slate-600">
+        {adminRole === 'superadmin' ? <button onClick={() => { window.location.href = '/admin/superadmin'; }} className="rounded-lg bg-[#2b4594] px-4 py-2 font-semibold text-white">Open real audit trail</button> : 'Audit records are available to the Super Admin only.'}
       </div>
     </div>
   );
 
-  // Roles
+  // Roles: use the unified account editor rather than misleading static definitions.
   return (
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => setActiveSection('overview')} className="text-sm text-[#2b4594] hover:underline">← Account management</button>
       </div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">Roles and permissions</h1>
-      <div className="space-y-4">
-        {[
-          { role: 'superadmin', perms: ['Full access', 'Billing management', 'User management', 'All site settings', 'All reports'] },
-          { role: 'admin',      perms: ['Site settings', 'Visitor management', 'People directory', 'Activity reports', 'Attendance reports'] },
-          { role: 'viewer',     perms: ['View activity', 'View attendance', 'View people directory'] },
-        ].map(({ role, perms }) => (
-          <div key={role} className="bg-white rounded-xl border border-slate-200 px-5 py-4">
-            <div className="flex items-center gap-2 mb-3">
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${ROLE_COLORS[role]}`}>{role}</span>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {perms.map(p => (
-                <span key={p} className="text-xs px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full text-slate-600">{p}</span>
-              ))}
-            </div>
-          </div>
-        ))}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <p className="text-sm text-slate-600 mb-4">Select a real Portal or Mobile account to change its role, assigned sites, camera access, and individual permissions. Changes apply immediately on the next protected request.</p>
+        {adminRole === 'superadmin' ? <button onClick={() => { window.location.href = '/admin/superadmin'; }} className="rounded-lg bg-[#2b4594] px-4 py-2 text-sm font-semibold text-white">Open account permission editor</button> : <p className="text-sm text-amber-700">Only a Super Admin can change company-wide account roles and permissions.</p>}
       </div>
     </div>
   );

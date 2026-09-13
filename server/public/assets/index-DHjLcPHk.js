@@ -33413,7 +33413,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-DXydW2JC.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-B21EjVyF.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -76122,11 +76122,6 @@ const ClientAPI = () => {
   ] });
 };
 const ROLES = ["superadmin", "admin", "viewer"];
-const ROLE_COLORS = {
-  superadmin: "bg-purple-100 text-purple-700",
-  admin: "bg-blue-100 text-[#2b4594]",
-  viewer: "bg-slate-100 text-slate-600"
-};
 const InviteModal = ({ onClose, onInvited }) => {
   const [email, setEmail] = reactExports.useState("");
   const [firstName, setFirstName] = reactExports.useState("");
@@ -77234,36 +77229,19 @@ const AccountManagement = () => {
   if (activeSection === "audit") return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-3xl", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-3 mb-6", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setActiveSection("overview"), className: "text-sm text-[#2b4594] hover:underline", children: "← Account management" }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold text-slate-800 mb-6", children: "Audit log" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-white rounded-xl border border-slate-200 overflow-hidden", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-sm", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-left", children: "Time" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-left", children: "User" }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "px-5 py-3 text-left", children: "Action" })
-      ] }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { className: "divide-y divide-slate-100", children: [
-        ["Today 14:32", "admin@signinapp.com", "Updated site settings for Tripod"],
-        ["Today 12:10", "admin@signinapp.com", "Added member: Arwa Ahmed"],
-        ["Today 09:05", "test@tripod.com", "Started evacuation at My remote site"],
-        ["Yesterday", "admin@signinapp.com", "Exported attendance report"],
-        ["3 Jul 2026", "admin@signinapp.com", "Created visitor group: Deliveries"]
-      ].map(([time, user, action], i2) => /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "hover:bg-slate-50", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-3 text-slate-400 text-xs whitespace-nowrap", children: time }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-3 text-slate-600 text-xs", children: user }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "px-5 py-3 text-slate-800 text-sm", children: action })
-      ] }, i2)) })
-    ] }) })
+    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-white rounded-xl border border-slate-200 p-6 text-sm text-slate-600", children: adminRole === "superadmin" ? /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+      window.location.href = "/admin/superadmin";
+    }, className: "rounded-lg bg-[#2b4594] px-4 py-2 font-semibold text-white", children: "Open real audit trail" }) : "Audit records are available to the Super Admin only." })
   ] });
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-2xl", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-3 mb-6", children: /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setActiveSection("overview"), className: "text-sm text-[#2b4594] hover:underline", children: "← Account management" }) }),
     /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-bold text-slate-800 mb-6", children: "Roles and permissions" }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-4", children: [
-      { role: "superadmin", perms: ["Full access", "Billing management", "User management", "All site settings", "All reports"] },
-      { role: "admin", perms: ["Site settings", "Visitor management", "People directory", "Activity reports", "Attendance reports"] },
-      { role: "viewer", perms: ["View activity", "View attendance", "View people directory"] }
-    ].map(({ role, perms }) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white rounded-xl border border-slate-200 px-5 py-4", children: [
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex items-center gap-2 mb-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `text-xs font-bold px-2.5 py-1 rounded-full capitalize ${ROLE_COLORS[role]}`, children: role }) }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-2", children: perms.map((p2) => /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-full text-slate-600", children: p2 }, p2)) })
-    ] }, role)) })
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "bg-white rounded-xl border border-slate-200 p-6", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-slate-600 mb-4", children: "Select a real Portal or Mobile account to change its role, assigned sites, camera access, and individual permissions. Changes apply immediately on the next protected request." }),
+      adminRole === "superadmin" ? /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => {
+        window.location.href = "/admin/superadmin";
+      }, className: "rounded-lg bg-[#2b4594] px-4 py-2 text-sm font-semibold text-white", children: "Open account permission editor" }) : /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-amber-700", children: "Only a Super Admin can change company-wide account roles and permissions." })
+    ] })
   ] });
 };
 const navItems = [
