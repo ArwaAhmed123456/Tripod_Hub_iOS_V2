@@ -228,6 +228,7 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
   const [useSubstream, setUseSubstream] = useState(() => isMobile());
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showPtz, setShowPtz] = useState(false);
+  const isAwaitingDss = camera.integration_status === 'awaiting_dss_api';
 
   // ── Fetch tokenised HLS session from backend ──────────────────────────────
   const fetchStreamSession = useCallback(async () => {
@@ -244,8 +245,8 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
   }, [camera.id]);
 
   useEffect(() => {
-    fetchStreamSession();
-  }, [fetchStreamSession]);
+    if (!isAwaitingDss) fetchStreamSession();
+  }, [fetchStreamSession, isAwaitingDss]);
 
   // ── Attach HLS player to <video> ─────────────────────────────────────────
   useEffect(() => {
@@ -371,7 +372,13 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
         />
 
         {/* Loading overlay */}
-        {loadingStream && (
+        {isAwaitingDss ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white p-4 text-center">
+            <VideoOff className="text-amber-400 mb-2" size={28} />
+            <p className="text-sm font-semibold text-slate-200">DSS connection pending</p>
+            <p className="text-xs text-slate-400 mt-1 max-w-xs">This Dahua P2P camera is assigned to this site. Live viewing will activate once the DSS stream integration is supplied.</p>
+          </div>
+        ) : loadingStream && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-white gap-2">
             <RefreshCw className="animate-spin text-[#2b4594]" size={24} />
             <p className="text-xs text-slate-300">Connecting live stream…</p>
@@ -395,8 +402,8 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
 
         {/* Live / Offline badge */}
         <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-semibold pointer-events-none">
-          <span className={`w-2 h-2 rounded-full ${!streamError ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-          {!streamError ? 'LIVE' : 'OFFLINE'}
+          <span className={`w-2 h-2 rounded-full ${isAwaitingDss ? 'bg-amber-400' : !streamError ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+          {isAwaitingDss ? 'SETUP PENDING' : !streamError ? 'LIVE' : 'OFFLINE'}
         </div>
 
         {/* Top-right quick actions — visible on hover or always on touch devices */}
@@ -452,6 +459,7 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
         <div className="min-w-0 flex-1">
           <h4 className="text-sm font-bold text-slate-900 leading-tight truncate">{camera.name}</h4>
           <p className="text-xs text-slate-500 mt-0.5 truncate">{camera.location || 'Site Location'}</p>
+          {isAwaitingDss && <p className="text-[11px] text-amber-700 mt-1">Dahua P2P · awaiting DSS stream connection</p>}
         </div>
 
         {isAdmin && (

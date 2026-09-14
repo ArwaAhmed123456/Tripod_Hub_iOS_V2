@@ -1148,6 +1148,9 @@ const ManagerScreen = ({ navigation, route }) => {
                     <View style={{ flex: 1 }}>
                       <Text style={s.visitName}>{cam.name}</Text>
                       <Text style={s.visitSub}>{cam.location}</Text>
+                      {cam.integration_status === 'awaiting_dss_api' && (
+                        <Text style={{ fontSize: 11, color: '#a16207', fontWeight: '600', marginTop: 2 }}>Dahua P2P · DSS connection pending</Text>
+                      )}
                       {cam.ptz_supported && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
                           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#2b4594' }} />
@@ -1158,10 +1161,10 @@ const ManagerScreen = ({ navigation, route }) => {
                     <TouchableOpacity
                       onPress={() => openCameraFeed(cam)}
                       style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#2b4594', borderRadius: 10 }}
-                      disabled={cam.status !== 'online'}
+                      disabled={cam.status !== 'online' || cam.integration_status === 'awaiting_dss_api'}
                     >
                       <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                        {cam.status === 'online' ? 'View' : 'Offline'}
+                        {cam.integration_status === 'awaiting_dss_api' ? 'Pending' : cam.status === 'online' ? 'View' : 'Offline'}
                       </Text>
                     </TouchableOpacity>
                   </View>

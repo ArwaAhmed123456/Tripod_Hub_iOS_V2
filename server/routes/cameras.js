@@ -145,6 +145,12 @@ const formatCameraResponse = (cam) => ({
     location: cam.location,
     stream_key: cam.streamKey,
     status: cam.status,
+    connection_type: cam.connectionType || 'rtsp',
+    integration_status: cam.integrationStatus || 'ready',
+    dss_device_id: cam.dssDeviceId || null,
+    device_model: cam.deviceModel || null,
+    audio_supported: Boolean(cam.audioSupported),
+    light_supported: Boolean(cam.lightSupported),
     ptz_supported: cam.ptzSupported || false,
     // Let the UI know whether an ONVIF/CGI address is configured so it can
     // show PTZ controls confidently (the actual URL is never sent to the client).
@@ -201,6 +207,12 @@ router.post('/:id/stream-session', verifyManagerOrAdmin, async (req, res) => {
             return res.status(400).json({ error: 'This camera stream is currently disabled' });
         }
 
+        if (camera.integrationStatus === 'awaiting_dss_api' || camera.connectionType === 'dss_p2p') {
+            return res.status(409).json({
+                error: 'This Dahua P2P camera is registered for this site, but its DSS stream integration has not yet been issued. Ask the CCTV provider for the DSS API/stream-proxy endpoint or a local RTSP/ONVIF connection.'
+            });
+        }
+
         const hasAccess = await checkCameraAccess(req.user, camera);
         if (!hasAccess) {
             return res.status(403).json({ error: 'Access denied: You do not have permission to view this camera' });
@@ -223,10 +235,11 @@ router.post('/:id/stream-session', verifyManagerOrAdmin, async (req, res) => {
 // ─── POST /api/cameras (Admin only) ───────────────────────────────────────────
 // Create a new camera linking to a site and RTSP source
 router.post('/', verifyManagerOrAdmin, async (req, res) => {
-    const { site_id, name, location, rtsp_url, sub_stream_rtsp_url, stream_key, ptz_supported, onvif_url, onvif_host } = req.body;
+    const { site_id, name, location, rtsp_url, sub_stream_rtsp_url, stream_key, ptz_supported, onvif_url, onvif_host,
+        connection_type = 'rtsp', integration_status, dss_device_id, device_model, audio_supported, light_supported } = req.body;
 
-    if (!site_id || !name || !rtsp_url) {
-        return res.status(400).json({ error: 'site_id, name, and rtsp_url are required' });
+    if (!site_id || !name || (connection_type !== 'dss_p2p' && !rtsp_url)) {
+        return res.status(400).json({ error: 'site_id and name are required; rtsp_url is required unless this is a Dahua P2P integration record' });
     }
 
     try {
@@ -241,13 +254,19 @@ router.post('/', verifyManagerOrAdmin, async (req, res) => {
             siteId: site._id,
             name: name.trim(),
             location: (location || 'Site Location').trim(),
-            rtspUrl: rtsp_url.trim(),
+            rtspUrl: rtsp_url ? rtsp_url.trim() : null,
             subStreamRtspUrl: sub_stream_rtsp_url ? sub_stream_rtsp_url.trim() : null,
             streamKey: generatedStreamKey,
             ptzSupported: Boolean(ptz_supported),
             onvifUrl: onvif_url ? onvif_url.trim() : null,
             onvifHost: onvif_host ? onvif_host.trim() : null,
             status: 'online',
+            connectionType: connection_type,
+            integrationStatus: integration_status || (connection_type === 'dss_p2p' ? 'awaiting_dss_api' : 'ready'),
+            dssDeviceId: dss_device_id ? dss_device_id.trim() : null,
+            deviceModel: device_model ? device_model.trim() : null,
+            audioSupported: Boolean(audio_supported),
+            lightSupported: Boolean(light_supported),
         });
 
         res.status(201).json({
@@ -267,7 +286,8 @@ router.post('/', verifyManagerOrAdmin, async (req, res) => {
 // ─── PUT /api/cameras/:id (Admin only) ────────────────────────────────────────
 // Update camera details
 router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
-    const { name, location, rtsp_url, sub_stream_rtsp_url, status, ptz_supported, order, onvif_url, onvif_host } = req.body;
+    const { name, location, rtsp_url, sub_stream_rtsp_url, status, ptz_supported, order, onvif_url, onvif_host,
+        connection_type, integration_status, dss_device_id, device_model, audio_supported, light_supported } = req.body;
 
     try {
         if (!(await canManageCameras(req.user))) return res.status(403).json({ error: 'Access denied: manage camera permission required' });
@@ -284,6 +304,12 @@ router.put('/:id', verifyManagerOrAdmin, async (req, res) => {
         if (order !== undefined) updates.order = Number(order);
         if (onvif_url !== undefined) updates.onvifUrl = onvif_url ? onvif_url.trim() : null;
         if (onvif_host !== undefined) updates.onvifHost = onvif_host ? onvif_host.trim() : null;
+        if (connection_type !== undefined) updates.connectionType = connection_type;
+        if (integration_status !== undefined) updates.integrationStatus = integration_status;
+        if (dss_device_id !== undefined) updates.dssDeviceId = dss_device_id ? dss_device_id.trim() : null;
+        if (device_model !== undefined) updates.deviceModel = device_model ? device_model.trim() : null;
+        if (audio_supported !== undefined) updates.audioSupported = Boolean(audio_supported);
+        if (light_supported !== undefined) updates.lightSupported = Boolean(light_supported);
 
         const camera = await Camera.findByIdAndUpdate(req.params.id, updates, { new: true });
         if (!camera) return res.status(404).json({ error: 'Camera not found' });

@@ -20,7 +20,10 @@ const cameraSchema = new mongoose.Schema({
     // RTSP URL with credentials - hidden by default from normal queries to prevent credential leaks
     rtspUrl: {
         type: String,
-        required: true,
+        // A Dahua P2P device has no LAN RTSP address until its DSS/Dahua
+        // integration has been provisioned.  All normal cameras still require
+        // an RTSP source.
+        required: function () { return this.connectionType !== 'dss_p2p'; },
         select: false, // Never returned unless explicitly queried with .select('+rtspUrl')
     },
     // Optional sub-stream for mobile / low-bandwidth data saving
@@ -36,6 +39,37 @@ const cameraSchema = new mongoose.Schema({
         unique: true,
         trim: true,
         lowercase: true,
+    },
+    // How this device is connected to Tripod Hub.  P2P records are retained in
+    // the site inventory but cannot produce a browser stream until Dahua/DSS
+    // issues an approved stream/API integration.
+    connectionType: {
+        type: String,
+        enum: ['rtsp', 'dss_p2p'],
+        default: 'rtsp',
+    },
+    integrationStatus: {
+        type: String,
+        enum: ['ready', 'awaiting_dss_api'],
+        default: 'ready',
+    },
+    dssDeviceId: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    deviceModel: {
+        type: String,
+        default: null,
+        trim: true,
+    },
+    audioSupported: {
+        type: Boolean,
+        default: false,
+    },
+    lightSupported: {
+        type: Boolean,
+        default: false,
     },
     status: {
         type: String,
