@@ -23,7 +23,10 @@ const cameraSchema = new mongoose.Schema({
         // A Dahua P2P device has no LAN RTSP address until its DSS/Dahua
         // integration has been provisioned.  All normal cameras still require
         // an RTSP source.
-        required: function () { return this.connectionType !== 'dss_p2p'; },
+        // Validation of an RTSP source is enforced by the create/update API.
+        // Keeping this optional at schema level lets an already-authorised
+        // Dahua P2P device be recorded before DSS issues its stream endpoint.
+        required: false,
         select: false, // Never returned unless explicitly queried with .select('+rtspUrl')
     },
     // Optional sub-stream for mobile / low-bandwidth data saving

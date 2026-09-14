@@ -33413,7 +33413,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-B21EjVyF.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-zhSGymVw.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -67135,7 +67135,8 @@ const VISIT_EXPORT_FIELDS = [
 const TAB_ITEMS = [
   { id: "visits", label: "Visit timeline" },
   { id: "prereg", label: "Pre-registrations" },
-  { id: "deliveries", label: "Deliveries" }
+  { id: "deliveries", label: "Deliveries" },
+  { id: "check-calls", label: "Check calls" }
 ];
 const StatCard$1 = ({ label, value: value2 }) => /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-[150px] rounded-xl border border-slate-200 bg-white px-6 py-5 shadow-sm", children: [
   /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-4xl font-semibold text-slate-800", children: value2 }),
@@ -68911,6 +68912,78 @@ const DeliveriesTab = ({ siteId, siteName }) => {
     ] }) })
   ] });
 };
+const CheckCallsTab = ({ siteId, siteName }) => {
+  const [report, setReport] = reactExports.useState({ shifts: [], calls: [] });
+  const [loading, setLoading] = reactExports.useState(false);
+  const load = async () => {
+    if (!siteId) return;
+    setLoading(true);
+    try {
+      const { data } = await api.get("/check-calls/report", { params: { site_id: siteId } });
+      setReport(data);
+    } catch {
+      zt$1.error("Could not load check calls");
+    } finally {
+      setLoading(false);
+    }
+  };
+  reactExports.useEffect(() => {
+    load();
+  }, [siteId]);
+  const fmt = (value2) => value2 ? new Date(value2).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "—";
+  const excel = () => downloadWorkbook(report.calls.map((c2) => ({ Guard: report.shifts.find((s2) => String(s2._id) === String(c2.shiftId))?.guardName || "", "Due time": fmt(c2.dueAt), "Response time": fmt(c2.respondedAt), Status: c2.status, Explanation: c2.explanation || "", Alerted: c2.alertedAt ? new Date(c2.alertedAt).toLocaleString("en-GB") : "" })), `${(siteName || "site").replace(/[^a-z0-9-_]+/gi, "-")}-check-calls.xlsx`, "Check Calls");
+  const print = () => {
+    const win = window.open("", "_blank");
+    if (!win) return;
+    const rows = report.shifts.map((s2) => {
+      const byHour = Object.fromEntries(report.calls.filter((c2) => String(c2.shiftId) === String(s2._id)).map((c2) => [new Date(c2.dueAt).getHours(), c2]));
+      const hours = s2.shiftType === "Night" ? [19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5, 6, 7] : [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+      return `<tr><td>${s2.guardName}</td><td>${s2.officerIdNumber || ""}</td><td>${s2.shiftType}</td>${hours.map((h2) => {
+        const c2 = byHour[h2];
+        return `<td class="${c2 && c2.status !== "yes" ? "bad" : ""}">${c2 ? c2.status === "yes" ? fmt(c2.respondedAt) : c2.status.toUpperCase() : "-"}</td>`;
+      }).join("")}</tr>`;
+    }).join("");
+    win.document.write(`<html><head><style>body{font-family:Arial;padding:24px}.head{display:flex;align-items:center;gap:15px;border-bottom:3px solid #2b4594;padding-bottom:12px}.head img{height:45px;max-width:160px}table{border-collapse:collapse;width:100%;font-size:10px;margin-top:16px}th,td{border:1px solid #94a3b8;padding:5px;text-align:center}.bad{color:#dc2626;font-weight:bold;background:#fef2f2}</style></head><body><div class="head"><img src="/Tipod_Final_Logo_high_pixel.png"/><div><h2 style="margin:0">Check Call Log</h2><p>${siteName || "Site"} · Generated ${(/* @__PURE__ */ new Date()).toLocaleString("en-GB")}</p></div></div><p>Precise check-call response times. Late, failed and missed calls are shown in red.</p><table><thead><tr><th>Security Officer</th><th>ID No</th><th>Shift</th>${[7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map((h2) => `<th>${String(h2).padStart(2, "0")}00</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`);
+    win.document.close();
+  };
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-4 flex items-center justify-between", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-xl font-bold text-slate-800", children: "Check Call Log" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm text-slate-500", children: [
+          "Live guard responses and missed-call follow-up for ",
+          siteName || "this site",
+          "."
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: load, className: "rounded-lg border px-3 py-2 text-sm", children: "Refresh" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: excel, className: "rounded-lg border border-[#2b4594] px-3 py-2 text-sm font-semibold text-[#2b4594]", children: "Excel" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: print, className: "rounded-lg bg-[#2b4594] px-3 py-2 text-sm font-semibold text-white", children: "Print / PDF" })
+      ] })
+    ] }),
+    loading ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { children: "Loading..." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "overflow-x-auto", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("table", { className: "w-full text-sm", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx("thead", { className: "bg-slate-50 text-left text-xs text-slate-500", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "p-3", children: "Guard" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "p-3", children: "Shift" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "p-3", children: "Started" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "p-3", children: "Check calls" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("th", { className: "p-3", children: "Missed / Failed" })
+      ] }) }),
+      /* @__PURE__ */ jsxRuntimeExports.jsx("tbody", { children: report.shifts.map((s2) => {
+        const calls = report.calls.filter((c2) => String(c2.shiftId) === String(s2._id));
+        const exceptions = calls.filter((c2) => c2.status === "missed" || c2.status === "no");
+        return /* @__PURE__ */ jsxRuntimeExports.jsxs("tr", { className: "border-t", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-3 font-medium", children: s2.guardName }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-3", children: s2.shiftType }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-3", children: fmt(s2.startedAt) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-3", children: calls.filter((c2) => c2.status === "yes").map((c2) => fmt(c2.respondedAt)).join(", ") || "—" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("td", { className: "p-3 font-semibold text-red-600", children: exceptions.map((c2) => `${c2.status.toUpperCase()} ${fmt(c2.dueAt)}`).join(", ") || "—" })
+        ] }, s2._id);
+      }) })
+    ] }) })
+  ] });
+};
 const ActivityPage = () => {
   const initialRange = getDateRange("today");
   const [activeTab, setActiveTab] = reactExports.useState("visits");
@@ -69697,7 +69770,8 @@ const ActivityPage = () => {
           }
         }
       ),
-      activeTab === "deliveries" && /* @__PURE__ */ jsxRuntimeExports.jsx(DeliveriesTab, { siteId: selectedSiteId, siteName })
+      activeTab === "deliveries" && /* @__PURE__ */ jsxRuntimeExports.jsx(DeliveriesTab, { siteId: selectedSiteId, siteName }),
+      activeTab === "check-calls" && /* @__PURE__ */ jsxRuntimeExports.jsx(CheckCallsTab, { siteId: selectedSiteId, siteName })
     ] }),
     showNewVisit && /* @__PURE__ */ jsxRuntimeExports.jsx(
       NewVisitModal,
@@ -116869,6 +116943,7 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
   const [useSubstream, setUseSubstream] = reactExports.useState(() => isMobile());
   const [isFullscreen, setIsFullscreen] = reactExports.useState(false);
   const [showPtz, setShowPtz] = reactExports.useState(false);
+  const isAwaitingDss = camera.integration_status === "awaiting_dss_api";
   const fetchStreamSession = reactExports.useCallback(async () => {
     setLoadingStream(true);
     setStreamError(null);
@@ -116882,8 +116957,8 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
     }
   }, [camera.id]);
   reactExports.useEffect(() => {
-    fetchStreamSession();
-  }, [fetchStreamSession]);
+    if (!isAwaitingDss) fetchStreamSession();
+  }, [fetchStreamSession, isAwaitingDss]);
   reactExports.useEffect(() => {
     if (!streamData) return;
     const streamUrl = useSubstream && streamData.low_res_hls_url ? streamData.low_res_hls_url : streamData.hls_url;
@@ -116984,7 +117059,11 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
                   "webkit-playsinline": "true"
                 }
               ),
-              loadingStream && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-white gap-2", children: [
+              isAwaitingDss ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute inset-0 flex flex-col items-center justify-center bg-slate-900/90 text-white p-4 text-center", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(VideoOff, { className: "text-amber-400 mb-2", size: 28 }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-slate-200", children: "DSS connection pending" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-400 mt-1 max-w-xs", children: "This Dahua P2P camera is assigned to this site. Live viewing will activate once the DSS stream integration is supplied." })
+              ] }) : loadingStream && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute inset-0 flex flex-col items-center justify-center bg-slate-900/80 text-white gap-2", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "animate-spin text-[#2b4594]", size: 24 }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-300", children: "Connecting live stream…" })
               ] }),
@@ -117005,8 +117084,8 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
                 )
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "absolute top-3 left-3 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-white text-[11px] font-semibold pointer-events-none", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `w-2 h-2 rounded-full ${!streamError ? "bg-green-500 animate-pulse" : "bg-red-500"}` }),
-                !streamError ? "LIVE" : "OFFLINE"
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: `w-2 h-2 rounded-full ${isAwaitingDss ? "bg-amber-400" : !streamError ? "bg-green-500 animate-pulse" : "bg-red-500"}` }),
+                isAwaitingDss ? "SETUP PENDING" : !streamError ? "LIVE" : "OFFLINE"
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: `absolute top-3 right-3 flex items-center gap-1.5 transition-opacity ${isMobile() ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`, children: [
                 camera.has_substream && /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -117046,7 +117125,8 @@ const CameraStreamTile = ({ camera, onEdit, onDelete, isAdmin }) => {
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between px-4 py-3 bg-white text-slate-800 border-t border-slate-100", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0 flex-1", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx("h4", { className: "text-sm font-bold text-slate-900 leading-tight truncate", children: camera.name }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mt-0.5 truncate", children: camera.location || "Site Location" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-slate-500 mt-0.5 truncate", children: camera.location || "Site Location" }),
+            isAwaitingDss && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-[11px] text-amber-700 mt-1", children: "Dahua P2P · awaiting DSS stream connection" })
           ] }),
           isAdmin && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5 ml-3 shrink-0", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
