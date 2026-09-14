@@ -145,6 +145,7 @@ const TAB_ITEMS = [
   { id: 'visits', label: 'Visit timeline' },
   { id: 'prereg', label: 'Pre-registrations' },
   { id: 'deliveries', label: 'Deliveries' },
+  { id: 'check-calls', label: 'Check calls' },
 ];
 
 const StatCard = ({ label, value }) => (
@@ -1922,6 +1923,17 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   );
 };
 
+const CheckCallsTab = ({ siteId, siteName }) => {
+  const [report, setReport] = useState({ shifts: [], calls: [] });
+  const [loading, setLoading] = useState(false);
+  const load = async () => { if (!siteId) return; setLoading(true); try { const { data } = await api.get('/check-calls/report', { params: { site_id: siteId } }); setReport(data); } catch { toast.error('Could not load check calls'); } finally { setLoading(false); } };
+  useEffect(() => { load(); }, [siteId]);
+  const fmt = value => value ? new Date(value).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }) : '—';
+  const excel = () => downloadWorkbook(report.calls.map(c => ({ Guard: report.shifts.find(s => String(s._id) === String(c.shiftId))?.guardName || '', 'Due time': fmt(c.dueAt), 'Response time': fmt(c.respondedAt), Status: c.status, Explanation: c.explanation || '', Alerted: c.alertedAt ? new Date(c.alertedAt).toLocaleString('en-GB') : '' })), `${(siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-')}-check-calls.xlsx`, 'Check Calls');
+  const print = () => { const win = window.open('', '_blank'); if (!win) return; const rows = report.shifts.map(s => { const byHour = Object.fromEntries(report.calls.filter(c => String(c.shiftId) === String(s._id)).map(c => [new Date(c.dueAt).getHours(), c])); const hours = s.shiftType === 'Night' ? [19,20,21,22,23,0,1,2,3,4,5,6,7] : [7,8,9,10,11,12,13,14,15,16,17,18,19]; return `<tr><td>${s.guardName}</td><td>${s.officerIdNumber || ''}</td><td>${s.shiftType}</td>${hours.map(h => { const c=byHour[h]; return `<td class="${c && c.status !== 'yes' ? 'bad' : ''}">${c ? (c.status === 'yes' ? fmt(c.respondedAt) : c.status.toUpperCase()) : '-'}</td>`; }).join('')}</tr>`; }).join(''); win.document.write(`<html><head><style>body{font-family:Arial;padding:24px}.head{display:flex;align-items:center;gap:15px;border-bottom:3px solid #2b4594;padding-bottom:12px}.head img{height:45px;max-width:160px}table{border-collapse:collapse;width:100%;font-size:10px;margin-top:16px}th,td{border:1px solid #94a3b8;padding:5px;text-align:center}.bad{color:#dc2626;font-weight:bold;background:#fef2f2}</style></head><body><div class="head"><img src="/Tipod_Final_Logo_high_pixel.png"/><div><h2 style="margin:0">Check Call Log</h2><p>${siteName || 'Site'} · Generated ${new Date().toLocaleString('en-GB')}</p></div></div><p>Precise check-call response times. Late, failed and missed calls are shown in red.</p><table><thead><tr><th>Security Officer</th><th>ID No</th><th>Shift</th>${[7,8,9,10,11,12,13,14,15,16,17,18,19].map(h=>`<th>${String(h).padStart(2,'0')}00</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table><script>window.onload=()=>window.print()<\/script></body></html>`); win.document.close(); };
+  return <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="mb-4 flex items-center justify-between"><div><h2 className="text-xl font-bold text-slate-800">Check Call Log</h2><p className="text-sm text-slate-500">Live guard responses and missed-call follow-up for {siteName || 'this site'}.</p></div><div className="flex gap-2"><button onClick={load} className="rounded-lg border px-3 py-2 text-sm">Refresh</button><button onClick={excel} className="rounded-lg border border-[#2b4594] px-3 py-2 text-sm font-semibold text-[#2b4594]">Excel</button><button onClick={print} className="rounded-lg bg-[#2b4594] px-3 py-2 text-sm font-semibold text-white">Print / PDF</button></div></div>{loading ? <p>Loading...</p> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-xs text-slate-500"><tr><th className="p-3">Guard</th><th className="p-3">Shift</th><th className="p-3">Started</th><th className="p-3">Check calls</th><th className="p-3">Missed / Failed</th></tr></thead><tbody>{report.shifts.map(s => { const calls=report.calls.filter(c=>String(c.shiftId)===String(s._id)); const exceptions=calls.filter(c=>c.status==='missed'||c.status==='no'); return <tr key={s._id} className="border-t"><td className="p-3 font-medium">{s.guardName}</td><td className="p-3">{s.shiftType}</td><td className="p-3">{fmt(s.startedAt)}</td><td className="p-3">{calls.filter(c=>c.status==='yes').map(c=>fmt(c.respondedAt)).join(', ') || '—'}</td><td className="p-3 font-semibold text-red-600">{exceptions.map(c=>`${c.status.toUpperCase()} ${fmt(c.dueAt)}`).join(', ') || '—'}</td></tr>; })}</tbody></table></div>}</div>;
+};
+
 const ActivityPage = () => {
   const initialRange = getDateRange('today');
   const [activeTab, setActiveTab] = useState('visits');
@@ -2810,6 +2822,9 @@ const ActivityPage = () => {
 
         {activeTab === 'deliveries' && (
           <DeliveriesTab siteId={selectedSiteId} siteName={siteName} />
+        )}
+        {activeTab === 'check-calls' && (
+          <CheckCallsTab siteId={selectedSiteId} siteName={siteName} />
         )}
       </div>
 

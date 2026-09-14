@@ -18,6 +18,7 @@ import { CalendarDays, ChevronDown, Download, LogIn, LogOut, RefreshCw, Search, 
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import CheckCallPanel from './CheckCallPanel';
 import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
@@ -597,6 +598,7 @@ const SecurityGuardScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
       </View>
+      <CheckCallPanel siteId={selectedSite?.id || user?.site_id || user?.project_id} />
 
       <View style={s.sitePickerWrap}>
         <TouchableOpacity onPress={() => setSiteOpen((value) => !value)} style={s.sitePickerBtn}>
