@@ -14,8 +14,7 @@ import {
   Vibration,
   Platform,
 } from 'react-native';
-import { Bell, CalendarDays, CheckCircle, ChevronDown, Download, MessageSquare, RefreshCw, X, LogOut, UserPlus, Search, Package, Video, VideoOff } from 'lucide-react-native';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { Bell, CalendarDays, CheckCircle, ChevronDown, Download, MessageSquare, RefreshCw, X, LogOut, UserPlus, Search, Package } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { File, Paths } from 'expo-file-system';
@@ -32,130 +31,7 @@ import {
   getVisitStats,
 } from '../services/enterprisePortal';
 
-const TABS = ['Overview', 'On-Site', 'Signed Out', 'Deliveries', 'Pre-Registration', 'Approvals', 'Guards', 'Cameras'];
-
-const LiveCameraModal = ({ visible, onClose, camera, streamSession, loading, onPtzStart, onPtzStop, onPreset }) => {
-  const streamUrl = streamSession?.low_res_hls_url || streamSession?.hls_url;
-  const player = useVideoPlayer(streamUrl ? { uri: streamUrl } : null, (p) => {
-    p.loop = true;
-    p.muted = true;
-    p.play();
-  });
-
-  const [showPtz, setShowPtz]         = useState(false);
-  const [showPresets, setShowPresets] = useState(false);
-
-  const PtzBtn = ({ label, dir, icon }) => (
-    <TouchableOpacity
-      onPressIn={() => onPtzStart?.(camera?.id, dir)}
-      onPressOut={() => onPtzStop?.(camera?.id, dir)}
-      style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-      accessibilityLabel={label}
-    >
-      <Text style={{ color: '#fff', fontSize: 18 }}>{icon}</Text>
-    </TouchableOpacity>
-  );
-
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: '#0f172a', justifyContent: 'center' }}>
-        {/* Header */}
-        <View style={{ paddingHorizontal: 18, paddingTop: 48, paddingBottom: 14, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#1e293b' }}>
-          <View>
-            <Text style={{ fontSize: 18, fontWeight: '800', color: '#fff' }}>{camera?.name || 'Camera Feed'}</Text>
-            <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 2 }}>{camera?.location || 'Site Location'}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-            {camera?.ptz_supported && (
-              <TouchableOpacity
-                onPress={() => setShowPtz(v => !v)}
-                style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: showPtz ? '#2b4594' : 'rgba(255,255,255,0.12)' }}
-              >
-                <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>PTZ</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity onPress={onClose} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-              <X size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Video */}
-        <View style={{ justifyContent: 'center', alignItems: 'center', backgroundColor: '#000', aspectRatio: 16 / 9, width: '100%' }}>
-          {loading ? (
-            <View style={{ alignItems: 'center', gap: 12 }}>
-              <ActivityIndicator size="large" color="#3b82f6" />
-              <Text style={{ color: '#94a3b8', fontSize: 14 }}>Connecting to live stream...</Text>
-            </View>
-          ) : streamUrl ? (
-            <VideoView
-              style={{ width: '100%', height: '100%' }}
-              player={player}
-              allowsFullscreen
-              allowsPictureInPicture
-              nativeControls
-            />
-          ) : (
-            <View style={{ alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: '#ef4444', fontSize: 28 }}>📷</Text>
-              <Text style={{ color: '#ef4444', fontSize: 14 }}>Camera feed is currently offline</Text>
-            </View>
-          )}
-        </View>
-
-        {/* PTZ Controls */}
-        {showPtz && camera?.ptz_supported && (
-          <View style={{ backgroundColor: '#1e293b', padding: 16 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-              {/* D-pad */}
-              <View style={{ gap: 4 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                  <PtzBtn label="Up"    dir="up"    icon="▲" />
-                </View>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <PtzBtn label="Left"  dir="left"  icon="◀" />
-                  <TouchableOpacity
-                    onPress={() => camera?.id && api.post(`/cameras/${camera.id}/ptz`, { action: 'stop' }).catch(() => {})}
-                    style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: '#64748b', fontSize: 16 }}>■</Text>
-                  </TouchableOpacity>
-                  <PtzBtn label="Right" dir="right" icon="▶" />
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'center' }}>
-                  <PtzBtn label="Down"  dir="down"  icon="▼" />
-                </View>
-              </View>
-              {/* Zoom */}
-              <View style={{ gap: 4 }}>
-                <PtzBtn label="Zoom In"  dir="zoom_in"  icon="＋" />
-                <PtzBtn label="Zoom Out" dir="zoom_out" icon="－" />
-              </View>
-              {/* Presets */}
-              <View style={{ gap: 4 }}>
-                <TouchableOpacity
-                  onPress={() => setShowPresets(v => !v)}
-                  style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: showPresets ? '#2b4594' : 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>P</Text>
-                </TouchableOpacity>
-                {showPresets && [1, 2, 3, 4].map(n => (
-                  <TouchableOpacity
-                    key={n}
-                    onPress={() => onPreset?.(camera?.id, n)}
-                    style={{ width: 46, height: 46, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' }}
-                  >
-                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{n}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-    </Modal>
-  );
-};
+const TABS = ['Overview', 'On-Site', 'Signed Out', 'Deliveries', 'Pre-Registration', 'Approvals', 'Guards'];
 
 const toApiDate = (value) => {
   if (!value) return '';
@@ -310,68 +186,6 @@ const ManagerScreen = ({ navigation, route }) => {
   const arrivalsInitialised = useRef(false);
 
   const managerName = user?.name || user?.firstName || 'Manager';
-
-  // ── Camera state ──────────────────────────────────────────────────────────
-  const [cameras, setCameras]               = useState([]);
-  const [camerasLoading, setCamerasLoading] = useState(false);
-  const [activeCameraModal, setActiveCameraModal] = useState(null);   // { camera, session }
-  const [sessionLoading, setSessionLoading] = useState(false);
-  const [ptzSpeed, setPtzSpeed]             = useState(4);
-  const activePtzDir = React.useRef(null);
-
-  const fetchCameras = useCallback(async (siteId) => {
-    if (!siteId) return;
-    setCamerasLoading(true);
-    try {
-      const res = await api.get(`/cameras?site_id=${siteId}`);
-      setCameras(res.data || []);
-    } catch {
-      setCameras([]);
-    } finally {
-      setCamerasLoading(false);
-    }
-  }, []);
-
-  // Reload cameras when Cameras tab is opened or site changes
-  useEffect(() => {
-    if (activeTab === 'Cameras' && selectedSite?.id) {
-      fetchCameras(selectedSite.id);
-    }
-  }, [activeTab, selectedSite?.id, fetchCameras]);
-
-  const openCameraFeed = async (camera) => {
-    setSessionLoading(true);
-    setActiveCameraModal({ camera, session: null });
-    try {
-      const res = await api.post(`/cameras/${camera.id}/stream-session`);
-      setActiveCameraModal({ camera, session: res.data.stream });
-    } catch {
-      setActiveCameraModal({ camera, session: null });
-    } finally {
-      setSessionLoading(false);
-    }
-  };
-
-  const sendPtz = useCallback(async (cameraId, action, direction, speed) => {
-    try {
-      await api.post(`/cameras/${cameraId}/ptz`, { action, direction, speed });
-    } catch { /* silent — PTZ errors shouldn't disrupt the UI */ }
-  }, []);
-
-  const handlePtzStart = (cameraId, direction) => {
-    activePtzDir.current = direction;
-    sendPtz(cameraId, 'start', direction, ptzSpeed);
-  };
-
-  const handlePtzStop = (cameraId, direction) => {
-    if (activePtzDir.current !== direction) return;
-    activePtzDir.current = null;
-    sendPtz(cameraId, 'stop', direction, 0);
-  };
-
-  const handlePreset = (cameraId, preset) => {
-    api.post(`/cameras/${cameraId}/ptz`, { action: 'goto_preset', preset }).catch(() => {});
-  };
 
   const handleLogout = () => {
     Alert.alert(

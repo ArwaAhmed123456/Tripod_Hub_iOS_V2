@@ -23,14 +23,12 @@ const auditLogSchema = new mongoose.Schema({
       'create_camera',
       'update_camera',
       'delete_camera',
-      'check_call_response',
-      'check_call_missed',
     ]
   },
   resourceType: {
     type: String,
     required: true,
-    enum: ['account', 'permission', 'visit', 'delivery', 'camera', 'report', 'site', 'check_call']
+    enum: ['account', 'permission', 'visit', 'delivery', 'camera', 'report', 'site']
   },
   resourceId: { type: String, required: true },
   siteId: { type: mongoose.Schema.Types.ObjectId, ref: 'Site', default: null },

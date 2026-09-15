@@ -93,8 +93,6 @@ app.use('/api/evacuation', evacuationRoutes);
 app.use('/api/posters', require('./routes/posters'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/cameras', require('./routes/cameras'));
-const checkCallsRoutes = require('./routes/checkCalls');
-app.use('/api/check-calls', checkCallsRoutes);
 app.use('/api/superadmin', require('./routes/superAdmin'));
 
 // Health check — always responds regardless of DB state
@@ -129,10 +127,6 @@ const io = new Server(server, {
 
 // Broadcast Socket.io to routes
 app.set('io', io);
-
-// A minute-level worker creates due calls and records timeouts. A hosted worker
-// or push provider can call the same API later; the database remains the source of truth.
-setInterval(() => checkCallsRoutes.processDueCalls().catch(err => console.error('[check-calls] scheduler:', err.message)), 60 * 1000);
 
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);

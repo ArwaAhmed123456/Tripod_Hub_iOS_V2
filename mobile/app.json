@@ -50,7 +50,6 @@
           }
         }
       ],
-      "expo-video"
     ],
     "extra": {
       "apiUrl": "https://tripod-signin-app.onrender.com/api",
