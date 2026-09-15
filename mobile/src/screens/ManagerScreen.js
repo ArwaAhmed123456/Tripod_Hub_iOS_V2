@@ -929,65 +929,6 @@ const ManagerScreen = ({ navigation, route }) => {
           </>
         )}
 
-        {/* ── Cameras tab ───────────────────────────────────────────────── */}
-        {activeTab === 'Cameras' && (
-          <>
-            <View style={s.sectionRow}>
-              <Text style={s.sectionTitle}>Live Camera Feeds</Text>
-              <TouchableOpacity onPress={() => fetchCameras(selectedSite?.id)}>
-                <RefreshCw size={18} color="#9ca3af" />
-              </TouchableOpacity>
-            </View>
-
-            {camerasLoading ? (
-              <View style={s.emptyCard}>
-                <ActivityIndicator color="#2b4594" />
-                <Text style={[s.emptyText, { marginTop: 8 }]}>Loading cameras…</Text>
-              </View>
-            ) : cameras.length === 0 ? (
-              <View style={s.emptyCard}>
-                <VideoOff size={28} color="#9ca3af" />
-                <Text style={[s.emptyText, { marginTop: 8 }]}>No cameras configured for this site.</Text>
-              </View>
-            ) : (
-              cameras.map((cam) => (
-                <View key={cam.id} style={[s.visitCard, { flexDirection: 'column', gap: 0, paddingBottom: 0 }]}>
-                  {/* Camera info row */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingBottom: 12, gap: 12 }}>
-                    <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: cam.status === 'online' ? '#dcfce7' : '#fee2e2', alignItems: 'center', justifyContent: 'center' }}>
-                      {cam.status === 'online'
-                        ? <Video size={20} color="#16a34a" />
-                        : <VideoOff size={20} color="#ef4444" />}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.visitName}>{cam.name}</Text>
-                      <Text style={s.visitSub}>{cam.location}</Text>
-                      {cam.integration_status === 'awaiting_dss_api' && (
-                        <Text style={{ fontSize: 11, color: '#a16207', fontWeight: '600', marginTop: 2 }}>Dahua P2P · DSS connection pending</Text>
-                      )}
-                      {cam.ptz_supported && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#2b4594' }} />
-                          <Text style={{ fontSize: 11, color: '#2b4594', fontWeight: '600' }}>PTZ</Text>
-                        </View>
-                      )}
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => openCameraFeed(cam)}
-                      style={{ paddingHorizontal: 14, paddingVertical: 8, backgroundColor: '#2b4594', borderRadius: 10 }}
-                      disabled={cam.status !== 'online' || cam.integration_status === 'awaiting_dss_api'}
-                    >
-                      <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>
-                        {cam.integration_status === 'awaiting_dss_api' ? 'Pending' : cam.status === 'online' ? 'View' : 'Offline'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))
-            )}
-          </>
-        )}
-
       </ScrollView>
 
       <PersonDetailsModal
@@ -996,17 +937,6 @@ const ManagerScreen = ({ navigation, route }) => {
         person={selectedPerson}
       />
 
-      {/* Live camera modal */}
-      <LiveCameraModal
-        visible={Boolean(activeCameraModal)}
-        onClose={() => setActiveCameraModal(null)}
-        camera={activeCameraModal?.camera}
-        streamSession={activeCameraModal?.session}
-        loading={sessionLoading}
-        onPtzStart={handlePtzStart}
-        onPtzStop={handlePtzStop}
-        onPreset={handlePreset}
-      />
     </SafeAreaView>
   );
 };
