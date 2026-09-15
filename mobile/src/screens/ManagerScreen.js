@@ -355,7 +355,7 @@ const ManagerScreen = ({ navigation, route }) => {
       const isDeliveryReport = activeTab === 'Deliveries';
       const headers = isDeliveryReport
         ? ['Item', 'Recipient', 'Sender', 'Carrier', 'Company', 'Recorded', 'Collected']
-        : ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company', 'Checked in by'];
+        : ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company Name', 'Checked in by'];
 
       const rows = list.map(item => isDeliveryReport ? ({
         Item: item.itemName || item.recipient || '',
@@ -368,7 +368,7 @@ const ManagerScreen = ({ navigation, route }) => {
       }) : ({
         Name: item.name || '', Role: item.group || '',
         'Sign In': fmtExportTime(item.sign_in_time), 'Sign Out': fmtExportTime(item.sign_out_time),
-        'Car Registration': item.car_reg || '', Company: item.trade || item.company_name || '',
+        'Car Registration': item.car_reg || '', 'Company Name': item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '',
         'Checked in by': item.checked_in_by || '',
       }));
 
@@ -445,7 +445,7 @@ const ManagerScreen = ({ navigation, route }) => {
   const matchesSearch = (item) => {
     const query = search.trim().toLowerCase();
     if (!query) return true;
-    return [item.name, item.group, item.role, item.trade, item.company_name, item.companyName,
+    return [item.name, item.group, item.role, item.trade, item.employee_company_name, item.employeeCompanyName, item.company_name, item.companyName,
       item.itemName, item.recipient, item.sender, item.carrier, item.company]
       .filter(Boolean)
       .join(' ')

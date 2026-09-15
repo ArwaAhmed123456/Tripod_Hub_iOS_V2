@@ -133,11 +133,10 @@ const CheckInModal = ({
   defaultGroup,
 }) => {
   const [name, setName] = useState('');
-  const [group, setGroup] = useState(defaultGroup || visitorGroups?.[0]?.name || 'Visitor');
+  const [group, setGroup] = useState('');
   const [notes, setNotes] = useState('');
   const [carRegistration, setCarRegistration] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [employeeCompanyName, setEmployeeCompanyName] = useState('');
 
   useEffect(() => {
     if (visible) {
@@ -145,8 +144,8 @@ const CheckInModal = ({
       setNotes('');
       setCarRegistration('');
       setCompanyName('');
-      setEmployeeCompanyName('');
-      setGroup(defaultGroup || 'Visitor');
+      // The company field is intentionally hidden until the guard chooses a type.
+      setGroup('');
     }
   }, [visible, defaultGroup, visitorGroups]);
 
@@ -171,7 +170,7 @@ const CheckInModal = ({
               return (
                 <TouchableOpacity
                   key={groupName}
-                  onPress={() => setGroup(groupName)}
+                  onPress={() => { setGroup(groupName); setCompanyName(''); }}
                   style={[s.groupChip, active && s.groupChipActive]}
                 >
                   <Text style={[s.groupChipText, active && s.groupChipTextActive]}>{groupName}</Text>
@@ -181,9 +180,7 @@ const CheckInModal = ({
           </ScrollView>
 
           <TextInput value={carRegistration} onChangeText={setCarRegistration} placeholder="Car registration number" placeholderTextColor="#9ca3af" style={s.input} autoCapitalize="characters" />
-          {group === 'Employee' ? (
-            <TextInput value={employeeCompanyName} onChangeText={setEmployeeCompanyName} placeholder="Employee Company Name (optional)" placeholderTextColor="#9ca3af" style={s.input} />
-          ) : (
+          {!!group && (
             <TextInput value={companyName} onChangeText={setCompanyName} placeholder={`${group} Company Name (optional)`} placeholderTextColor="#9ca3af" style={s.input} />
           )}
 
@@ -206,7 +203,11 @@ const CheckInModal = ({
                   Alert.alert('Name required', 'Please enter the visitor or staff name.');
                   return;
                 }
-                onSubmit({ name: name.trim(), group, notes: notes.trim(), carRegistration: carRegistration.trim(), companyName: companyName.trim(), employeeCompanyName: employeeCompanyName.trim() });
+                if (!group) {
+                  Alert.alert('Person type required', 'Please choose Visitor, Worker, Contractor, or Employee.');
+                  return;
+                }
+                onSubmit({ name: name.trim(), group, notes: notes.trim(), carRegistration: carRegistration.trim(), companyName: companyName.trim() });
               }}
               disabled={loading}
               style={s.modalConfirmBtn}
@@ -373,7 +374,7 @@ const SecurityGuardScreen = ({ navigation }) => {
       const title = `Security Report — ${siteName} — ${tabName}`;
       const filenameBase = `${siteName}-${tabName}-${dateStr}`;
 
-      const headers = ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company', 'Expected Arrival', 'Description'];
+      const headers = ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company Name', 'Expected Arrival', 'Description'];
 
       // If date filters are set, fetch a date-filtered list from the API
       let exportList;
@@ -403,7 +404,7 @@ const SecurityGuardScreen = ({ navigation }) => {
         'Sign In':          fmtExportTime(item.sign_in_time),
         'Sign Out':         fmtExportTime(item.sign_out_time),
         'Car Registration': item.car_reg || '',
-        Company:            item.trade || item.company_name || '',
+        'Company Name':     item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '',
         'Expected Arrival': fmtExportTime(item.expected_date),
         Description:        item.notes || '',
       }));
@@ -420,7 +421,7 @@ const SecurityGuardScreen = ({ navigation }) => {
     }
   };
 
-  const handleCheckIn = async ({ name, group, notes, carRegistration, companyName, employeeCompanyName }) => {
+  const handleCheckIn = async ({ name, group, notes, carRegistration, companyName }) => {
     if (!selectedSite?.id) {
       Alert.alert('Site required', 'Please select a site before signing someone in.');
       return;
@@ -435,7 +436,6 @@ const SecurityGuardScreen = ({ navigation }) => {
         notes,
         carRegistration,
         companyName,
-        employeeCompanyName,
       });
       setCheckInOpen(false);
       await loadSiteData(selectedSite.id);

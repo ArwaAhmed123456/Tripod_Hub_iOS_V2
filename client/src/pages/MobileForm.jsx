@@ -30,7 +30,6 @@ const MobileForm = () => {
 
     // Details form
     const [name, setName] = useState('');
-    const [company, setCompany] = useState('');
     const [employeeCompanyName, setEmployeeCompanyName] = useState('');
     const [visiting, setVisiting] = useState('');
     const [visitingOpen, setVisitingOpen] = useState(false);
@@ -161,11 +160,10 @@ const MobileForm = () => {
             const formData = new FormData();
             formData.append('project_code', project.code);
             formData.append('name', name.trim());
-            formData.append('trade', company.trim() || '');
             formData.append('car_reg', carReg.trim() || '');
             formData.append('user_type', selectedGroup?.name || 'Visitor');
-            if (selectedGroup?.name?.toLowerCase().includes('employee') && employeeCompanyName.trim()) {
-                formData.append('employee_company_name', employeeCompanyName.trim());
+            if (employeeCompanyName.trim()) {
+              formData.append('employee_company_name', employeeCompanyName.trim());
             }
             formData.append('date', today);
             formData.append('time_in', timeStr);
@@ -255,9 +253,7 @@ const MobileForm = () => {
                             key={g.id || g.name}
                             onClick={() => {
                                 setSelectedGroup(g);
-                                if (!g.name?.toLowerCase().includes('employee')) {
-                                    setEmployeeCompanyName('');
-                                }
+                                setEmployeeCompanyName('');
                                 setStep('details');
                             }}
                             className="w-full py-4 rounded-xl border border-slate-200 text-slate-700 text-base font-medium shadow-sm hover:border-slate-400 transition-colors bg-white"
@@ -275,7 +271,6 @@ const MobileForm = () => {
     // ════════════════════════════════════════════════════════════════
     if (step === 'details') {
         const isVisitor = selectedGroup?.name?.toLowerCase().includes('visitor');
-        const isEmployee = selectedGroup?.name?.toLowerCase().includes('employee');
 
         return (
             <div className="min-h-screen bg-white flex flex-col">
@@ -311,29 +306,17 @@ const MobileForm = () => {
                         {errors.name && <p className="text-red-500 text-xs">{errors.name}</p>}
                     </div>
 
-                    {/* Company */}
-                    <div className="flex flex-col gap-1">
-                        <label className="text-sm font-medium text-slate-700">Company</label>
-                        <input
-                            type="text"
-                            value={company}
-                            onChange={e => setCompany(e.target.value)}
-                            placeholder="Your company"
-                            className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
-                        />
-                    </div>
-
-                    {/* Employee Company Name */}
-                    {isEmployee && (
+                    {/* Optional company name — shown only after a person type is chosen. */}
+                    {selectedGroup?.name && (
                         <div className="flex flex-col gap-1">
                             <label className="text-sm font-medium text-slate-700">
-                                Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                                {selectedGroup.name.replace(/s$/i, '')} Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
                             </label>
                             <input
                                 type="text"
                                 value={employeeCompanyName}
                                 onChange={e => setEmployeeCompanyName(e.target.value)}
-                                placeholder="Enter employee company name"
+                                placeholder={`Enter ${selectedGroup.name.replace(/s$/i, '').toLowerCase()} company name`}
                                 className="w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
                             />
                         </div>

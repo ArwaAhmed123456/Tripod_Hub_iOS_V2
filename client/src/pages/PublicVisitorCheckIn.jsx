@@ -55,7 +55,6 @@ const PublicVisitorCheckIn = () => {
 
   // Form fields
   const [name, setName]       = useState('');
-  const [company, setCompany] = useState('');
   const [employeeCompanyName, setEmployeeCompanyName] = useState('');
   const [visiting, setVisiting] = useState('');
   const [carReg, setCarReg]   = useState('');
@@ -87,11 +86,18 @@ const PublicVisitorCheckIn = () => {
         ]);
         setSite(siteRes.data || { name: 'Reception', id: siteId });
         const grpList = (groupsRes.data || []).filter(g => g.allow_self_sign_in !== false);
-        setGroups(grpList.length > 0 ? grpList : [
-          { id: 'v', name: 'Visitors',   type: 'Standard' },
-          { id: 'e', name: 'Employees',  type: 'Repeat'   },
-          { id: 'd', name: 'Deliveries', type: 'Delivery' },
-        ]);
+        const commonPersonTypes = [
+          { id: 'visitor', name: 'Visitors', type: 'Standard' },
+          { id: 'worker', name: 'Workers', type: 'Standard' },
+          { id: 'contractor', name: 'Contractors', type: 'Standard' },
+          { id: 'employee', name: 'Employees', type: 'Repeat' },
+        ];
+        const mergedGroups = [...commonPersonTypes, ...grpList].reduce((items, item) => {
+          const exists = items.some((entry) => entry.name?.toLowerCase() === item.name?.toLowerCase());
+          if (!exists) items.push(item);
+          return items;
+        }, []);
+        setGroups(mergedGroups);
       } catch {
         setSite({ name: 'Reception', id: siteId });
       } finally {
@@ -255,13 +261,11 @@ const PublicVisitorCheckIn = () => {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const isEmp = selectedGroup?.name?.toLowerCase().includes('employee');
       const res = await publicApi.post('/visits/public', {
         site_id:               siteId,
         name:                  name.trim(),
         group:                 selectedGroup?.name || 'Visitor',
-        trade:                 company.trim()  || undefined,
-        employee_company_name: (isEmp && employeeCompanyName.trim()) ? employeeCompanyName.trim() : undefined,
+        employee_company_name: employeeCompanyName.trim() || undefined,
         car_reg:               carReg.trim()   || undefined,
         reason:                visiting.trim() || undefined,
         photo_base64:          photoDataUrl    || undefined,  // send captured photo
@@ -354,9 +358,7 @@ const PublicVisitorCheckIn = () => {
             {groups.map(g => (
               <button key={g.id} onClick={() => {
                 setSelectedGroup(g);
-                if (!g.name?.toLowerCase().includes('employee')) {
-                  setEmployeeCompanyName('');
-                }
+                setEmployeeCompanyName('');
                 goToStep('details');
               }}
                 className="w-full text-left px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-medium text-base hover:border-slate-400 active:bg-slate-50 transition-colors shadow-sm">
@@ -389,25 +391,15 @@ const PublicVisitorCheckIn = () => {
               {nameError && <p className="text-red-500 text-xs mt-1">{nameError}</p>}
             </div>
 
-            {/* Company */}
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Company</label>
-              <div className="flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white">
-                <input value={company} onChange={e => setCompany(e.target.value)}
-                  placeholder="" className="flex-1 text-base text-slate-900 outline-none bg-transparent" />
-                {company && <button onClick={() => setCompany('')} className="ml-2 text-slate-400"><X size={16} /></button>}
-              </div>
-            </div>
-
-            {/* Employee Company Name */}
-            {selectedGroup?.name?.toLowerCase().includes('employee') && (
+            {/* Optional company name — shown only after a person type is chosen. */}
+            {selectedGroup?.name && (
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Employee Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
+                  {selectedGroup.name.replace(/s$/i, '')} Company Name <span className="text-slate-400 font-normal text-xs">(Optional)</span>
                 </label>
                 <div className="flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white">
                   <input value={employeeCompanyName} onChange={e => setEmployeeCompanyName(e.target.value)}
-                    placeholder="Enter employee company name" className="flex-1 text-base text-slate-900 outline-none bg-transparent" />
+                    placeholder={`Enter ${selectedGroup.name.replace(/s$/i, '').toLowerCase()} company name`} className="flex-1 text-base text-slate-900 outline-none bg-transparent" />
                   {employeeCompanyName && <button onClick={() => setEmployeeCompanyName('')} className="ml-2 text-slate-400"><X size={16} /></button>}
                 </div>
               </div>

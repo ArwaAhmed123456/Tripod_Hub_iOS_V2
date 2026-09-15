@@ -116,7 +116,7 @@ const VISIT_EXPORT_FIELDS = [
   { id: 'Time Out', value: (visit) => formatDateTime(visit.sign_out_time) },
   { id: 'Role', value: (visit) => visit.group || visit.user_type || '' },
   { id: 'Company', value: (visit) => visit.trade || visit.company || '' },
-  { id: 'Employee Company Name', value: (visit) => visit.employee_company_name || '' },
+  { id: 'Company Name', value: (visit) => visit.employee_company_name || '' },
   { id: 'Expected Arrival', value: (visit) => formatDateTime(visit.expected_date || visit.expectedArrival) },
   { id: 'Description', value: (visit) => visit.description || visit.reason || '' },
   { id: 'Purpose of Visit', value: (visit) => visit.reason || '' },
@@ -546,7 +546,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
         site_id: siteId,
         group,
         trade,
-        employee_company_name: group.toLowerCase().includes('employee') ? employeeCompanyName : '',
+        employee_company_name: employeeCompanyName,
         car_reg: carReg,
         reason,
         date,
@@ -618,7 +618,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
                 onChange={(e) => {
                   const nextGroup = e.target.value;
                   setGroup(nextGroup);
-                  if (!nextGroup.toLowerCase().includes('employee')) setEmployeeCompanyName('');
+                  setEmployeeCompanyName('');
                 }}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
               >
@@ -712,16 +712,16 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
             </div>
           </div>
 
-          {group.toLowerCase().includes('employee') && (
+          {!!group && (
             <div>
               <label className="mb-1 block text-sm font-semibold text-slate-700">
-                Employee Company Name <span className="text-xs font-normal text-slate-400">(Optional)</span>
+                {group.replace(/s$/i, '')} Company Name <span className="text-xs font-normal text-slate-400">(Optional)</span>
               </label>
               <input
                 type="text"
                 value={employeeCompanyName}
                 onChange={(e) => setEmployeeCompanyName(e.target.value)}
-                placeholder="Enter employee company name"
+                placeholder={`Enter ${group.replace(/s$/i, '').toLowerCase()} company name`}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
               />
             </div>
@@ -1956,7 +1956,7 @@ const ActivityPage = () => {
     'Photo',
     'Site',
     'Group',
-    'Employee company',
+    'Company Name',
     'Signed in',
     'Signed out',
     'Duration',
@@ -2259,8 +2259,8 @@ const ActivityPage = () => {
       render: (visit) => visit.group || '--',
     },
     {
-      key: 'Employee company',
-      header: <span>Employee company</span>,
+      key: 'Company Name',
+      header: <span>Company name</span>,
       render: (visit) => visit.employee_company_name || '--',
     },
     {
@@ -2329,7 +2329,7 @@ const ActivityPage = () => {
   ];
 
   // Separate columns into sections for the settings panel
-  const VISIT_DETAIL_COLS = ['Name', 'Photo', 'Site', 'Group', 'Employee company', 'Signed in', 'Signed out', 'Duration', 'Notes'];
+  const VISIT_DETAIL_COLS = ['Name', 'Photo', 'Site', 'Group', 'Company Name', 'Signed in', 'Signed out', 'Duration', 'Notes'];
   const PERSONAL_FIELD_COLS = ['Email', 'Mobile', 'Role'];
 
   return (
@@ -2917,7 +2917,7 @@ const ActivityPage = () => {
                   )}
                   {selectedVisit.employee_company_name && (
                     <div className="grid grid-cols-2 gap-2">
-                      <span className="text-slate-500">Employee company</span>
+                      <span className="text-slate-500">Company name</span>
                       <span className="font-medium text-slate-800">{selectedVisit.employee_company_name}</span>
                     </div>
                   )}

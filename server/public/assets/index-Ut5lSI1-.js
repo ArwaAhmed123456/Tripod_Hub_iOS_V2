@@ -18265,7 +18265,6 @@ const MobileForm = () => {
   const [step, setStep] = reactExports.useState("welcome");
   const [selectedGroup, setSelectedGroup] = reactExports.useState(null);
   const [name, setName] = reactExports.useState("");
-  const [company, setCompany] = reactExports.useState("");
   const [employeeCompanyName, setEmployeeCompanyName] = reactExports.useState("");
   const [visiting, setVisiting] = reactExports.useState("");
   const [visitingOpen, setVisitingOpen] = reactExports.useState(false);
@@ -18376,10 +18375,9 @@ const MobileForm = () => {
       const formData = new FormData();
       formData.append("project_code", project.code);
       formData.append("name", name.trim());
-      formData.append("trade", company.trim() || "");
       formData.append("car_reg", carReg.trim() || "");
       formData.append("user_type", selectedGroup?.name || "Visitor");
-      if (selectedGroup?.name?.toLowerCase().includes("employee") && employeeCompanyName.trim()) {
+      if (employeeCompanyName.trim()) {
         formData.append("employee_company_name", employeeCompanyName.trim());
       }
       formData.append("date", today2);
@@ -18441,9 +18439,7 @@ const MobileForm = () => {
         {
           onClick: () => {
             setSelectedGroup(g2);
-            if (!g2.name?.toLowerCase().includes("employee")) {
-              setEmployeeCompanyName("");
-            }
+            setEmployeeCompanyName("");
             setStep("details");
           },
           className: "w-full py-4 rounded-xl border border-slate-200 text-slate-700 text-base font-medium shadow-sm hover:border-slate-400 transition-colors bg-white",
@@ -18455,7 +18451,6 @@ const MobileForm = () => {
   }
   if (step === "details") {
     const isVisitor = selectedGroup?.name?.toLowerCase().includes("visitor");
-    const isEmployee = selectedGroup?.name?.toLowerCase().includes("employee");
     return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-h-screen bg-white flex flex-col", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between px-6 py-4 border-b border-slate-200", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-2xl font-semibold text-slate-900", children: "Details" }),
@@ -18492,22 +18487,10 @@ const MobileForm = () => {
           ),
           errors.name && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-500 text-xs", children: errors.name })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "text-sm font-medium text-slate-700", children: "Company" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "input",
-            {
-              type: "text",
-              value: company,
-              onChange: (e2) => setCompany(e2.target.value),
-              placeholder: "Your company",
-              className: "w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
-            }
-          )
-        ] }),
-        isEmployee && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1", children: [
+        selectedGroup?.name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "text-sm font-medium text-slate-700", children: [
-            "Employee Company Name ",
+            selectedGroup.name.replace(/s$/i, ""),
+            " Company Name ",
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -18516,7 +18499,7 @@ const MobileForm = () => {
               type: "text",
               value: employeeCompanyName,
               onChange: (e2) => setEmployeeCompanyName(e2.target.value),
-              placeholder: "Enter employee company name",
+              placeholder: `Enter ${selectedGroup.name.replace(/s$/i, "").toLowerCase()} company name`,
               className: "w-full border border-slate-300 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-300"
             }
           )
@@ -33413,7 +33396,7 @@ function le(t3) {
   var h2 = l2.getContext("2d");
   h2.fillStyle = "#fff", h2.fillRect(0, 0, l2.width, l2.height);
   var f2 = { ignoreMouse: true, ignoreAnimation: true, ignoreDimensions: true }, d2 = this;
-  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-DEmNRUOO.js"), true ? [] : void 0)).catch(function(t4) {
+  return (i.canvg ? Promise.resolve(i.canvg) : __vitePreload(() => import("./index.es-Bb9eN2t5.js"), true ? [] : void 0)).catch(function(t4) {
     return Promise.reject(new Error("Could not load canvg: " + t4));
   }).then(function(t4) {
     return t4.default ? t4.default : t4;
@@ -67108,7 +67091,7 @@ const VISIT_EXPORT_FIELDS = [
   { id: "Time Out", value: (visit) => formatDateTime(visit.sign_out_time) },
   { id: "Role", value: (visit) => visit.group || visit.user_type || "" },
   { id: "Company", value: (visit) => visit.trade || visit.company || "" },
-  { id: "Employee Company Name", value: (visit) => visit.employee_company_name || "" },
+  { id: "Company Name", value: (visit) => visit.employee_company_name || "" },
   { id: "Expected Arrival", value: (visit) => formatDateTime(visit.expected_date || visit.expectedArrival) },
   { id: "Description", value: (visit) => visit.description || visit.reason || "" },
   { id: "Purpose of Visit", value: (visit) => visit.reason || "" },
@@ -67524,7 +67507,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
         site_id: siteId,
         group,
         trade,
-        employee_company_name: group.toLowerCase().includes("employee") ? employeeCompanyName : "",
+        employee_company_name: employeeCompanyName,
         car_reg: carReg,
         reason,
         date,
@@ -67595,7 +67578,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
               onChange: (e2) => {
                 const nextGroup = e2.target.value;
                 setGroup(nextGroup);
-                if (!nextGroup.toLowerCase().includes("employee")) setEmployeeCompanyName("");
+                setEmployeeCompanyName("");
               },
               className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]",
               children: (groups.length > 0 ? groups : [
@@ -67696,9 +67679,10 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
           )
         ] })
       ] }),
-      group.toLowerCase().includes("employee") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+      !!group && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "mb-1 block text-sm font-semibold text-slate-700", children: [
-          "Employee Company Name ",
+          group.replace(/s$/i, ""),
+          " Company Name ",
           /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs font-normal text-slate-400", children: "(Optional)" })
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -67707,7 +67691,7 @@ const EditVisitModal = ({ visit, sites, groups, onClose, onSaved }) => {
             type: "text",
             value: employeeCompanyName,
             onChange: (e2) => setEmployeeCompanyName(e2.target.value),
-            placeholder: "Enter employee company name",
+            placeholder: `Enter ${group.replace(/s$/i, "").toLowerCase()} company name`,
             className: "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
           }
         )
@@ -68945,7 +68929,7 @@ const ActivityPage = () => {
     "Photo",
     "Site",
     "Group",
-    "Employee company",
+    "Company Name",
     "Signed in",
     "Signed out",
     "Duration"
@@ -69187,8 +69171,8 @@ const ActivityPage = () => {
       render: (visit) => visit.group || "--"
     },
     {
-      key: "Employee company",
-      header: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Employee company" }),
+      key: "Company Name",
+      header: /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Company name" }),
       render: (visit) => visit.employee_company_name || "--"
     },
     {
@@ -69237,7 +69221,7 @@ const ActivityPage = () => {
       render: (visit) => visit.role || "--"
     }
   ];
-  const VISIT_DETAIL_COLS = ["Name", "Photo", "Site", "Group", "Employee company", "Signed in", "Signed out", "Duration", "Notes"];
+  const VISIT_DETAIL_COLS = ["Name", "Photo", "Site", "Group", "Company Name", "Signed in", "Signed out", "Duration", "Notes"];
   const PERSONAL_FIELD_COLS = ["Email", "Mobile", "Role"];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "h-full overflow-auto bg-slate-50", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx(Fe$1, { position: "top-right" }),
@@ -69781,7 +69765,7 @@ const ActivityPage = () => {
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-slate-800", children: selectedVisit.trade })
               ] }),
               selectedVisit.employee_company_name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Employee company" }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-500", children: "Company name" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-medium text-slate-800", children: selectedVisit.employee_company_name })
               ] }),
               selectedVisit.car_reg && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-2", children: [
@@ -78647,7 +78631,6 @@ const PublicVisitorCheckIn = () => {
   const [selectedGroup, setSelectedGroup] = reactExports.useState(null);
   const [visitId, setVisitId] = reactExports.useState(null);
   const [name, setName] = reactExports.useState("");
-  const [company, setCompany] = reactExports.useState("");
   const [employeeCompanyName, setEmployeeCompanyName] = reactExports.useState("");
   const [visiting, setVisiting] = reactExports.useState("");
   const [carReg, setCarReg] = reactExports.useState("");
@@ -78671,11 +78654,18 @@ const PublicVisitorCheckIn = () => {
         ]);
         setSite(siteRes.data || { name: "Reception", id: siteId });
         const grpList = (groupsRes.data || []).filter((g2) => g2.allow_self_sign_in !== false);
-        setGroups(grpList.length > 0 ? grpList : [
-          { id: "v", name: "Visitors", type: "Standard" },
-          { id: "e", name: "Employees", type: "Repeat" },
-          { id: "d", name: "Deliveries", type: "Delivery" }
-        ]);
+        const commonPersonTypes = [
+          { id: "visitor", name: "Visitors", type: "Standard" },
+          { id: "worker", name: "Workers", type: "Standard" },
+          { id: "contractor", name: "Contractors", type: "Standard" },
+          { id: "employee", name: "Employees", type: "Repeat" }
+        ];
+        const mergedGroups = [...commonPersonTypes, ...grpList].reduce((items, item) => {
+          const exists = items.some((entry) => entry.name?.toLowerCase() === item.name?.toLowerCase());
+          if (!exists) items.push(item);
+          return items;
+        }, []);
+        setGroups(mergedGroups);
       } catch {
         setSite({ name: "Reception", id: siteId });
       } finally {
@@ -78801,13 +78791,11 @@ const PublicVisitorCheckIn = () => {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const isEmp = selectedGroup?.name?.toLowerCase().includes("employee");
       const res = await publicApi.post("/visits/public", {
         site_id: siteId,
         name: name.trim(),
         group: selectedGroup?.name || "Visitor",
-        trade: company.trim() || void 0,
-        employee_company_name: isEmp && employeeCompanyName.trim() ? employeeCompanyName.trim() : void 0,
+        employee_company_name: employeeCompanyName.trim() || void 0,
         car_reg: carReg.trim() || void 0,
         reason: visiting.trim() || void 0,
         photo_base64: photoDataUrl || void 0
@@ -78886,9 +78874,7 @@ const PublicVisitorCheckIn = () => {
         {
           onClick: () => {
             setSelectedGroup(g2);
-            if (!g2.name?.toLowerCase().includes("employee")) {
-              setEmployeeCompanyName("");
-            }
+            setEmployeeCompanyName("");
             goToStep("details");
           },
           className: "w-full text-left px-5 py-4 rounded-2xl border border-slate-200 bg-white text-slate-800 font-medium text-base hover:border-slate-400 active:bg-slate-50 transition-colors shadow-sm",
@@ -78925,24 +78911,10 @@ const PublicVisitorCheckIn = () => {
           ] }),
           nameError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-red-500 text-xs mt-1", children: nameError })
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx("label", { className: "block text-sm font-medium text-slate-700 mb-1", children: "Company" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              "input",
-              {
-                value: company,
-                onChange: (e2) => setCompany(e2.target.value),
-                placeholder: "",
-                className: "flex-1 text-base text-slate-900 outline-none bg-transparent"
-              }
-            ),
-            company && /* @__PURE__ */ jsxRuntimeExports.jsx("button", { onClick: () => setCompany(""), className: "ml-2 text-slate-400", children: /* @__PURE__ */ jsxRuntimeExports.jsx(X$1, { size: 16 }) })
-          ] })
-        ] }),
-        selectedGroup?.name?.toLowerCase().includes("employee") && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        selectedGroup?.name && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("label", { className: "block text-sm font-medium text-slate-700 mb-1", children: [
-            "Employee Company Name ",
+            selectedGroup.name.replace(/s$/i, ""),
+            " Company Name ",
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-slate-400 font-normal text-xs", children: "(Optional)" })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center border border-slate-200 rounded-xl px-4 py-3 bg-white", children: [
@@ -78951,7 +78923,7 @@ const PublicVisitorCheckIn = () => {
               {
                 value: employeeCompanyName,
                 onChange: (e2) => setEmployeeCompanyName(e2.target.value),
-                placeholder: "Enter employee company name",
+                placeholder: `Enter ${selectedGroup.name.replace(/s$/i, "").toLowerCase()} company name`,
                 className: "flex-1 text-base text-slate-900 outline-none bg-transparent"
               }
             ),

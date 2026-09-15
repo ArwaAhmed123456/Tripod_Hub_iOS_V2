@@ -139,15 +139,15 @@ export const getVisitorGroups = async (siteId) => {
   }
 };
 
-export const signInVisitor = async ({ siteId, name, group, notes, carRegistration, companyName, employeeCompanyName }) => {
+export const signInVisitor = async ({ siteId, name, group, notes, carRegistration, companyName }) => {
   const response = await api.post('/visits', {
     site_id: siteId,
     name,
     group,
     notes,
     car_reg: carRegistration || undefined,
-    employee_company_name: employeeCompanyName || undefined,
-    company_name: companyName || undefined,
+    // This is a generic company value despite the legacy API field name.
+    employee_company_name: companyName || undefined,
   });
   return response?.data;
 };

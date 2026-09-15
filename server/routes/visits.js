@@ -207,6 +207,7 @@ router.get('/', verifyAdmin, async (req, res) => {
         filter.$or = [
           { name: match },
           { trade: match },
+          { employeeCompanyName: match },
           { userType: match },
         ];
       }
