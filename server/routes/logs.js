@@ -47,7 +47,7 @@ router.post('/', upload.single('image'), async (req,res) => {
     if (!site) return res.status(400).json({error:'Invalid project code'});
     let hours=null;
     if (time_out) { const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`); hours=parseFloat(((ms<0?ms+86400000:ms)/3600000).toFixed(2)); }
-    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    const empCompany = employee_company_name ? employee_company_name.trim() : null;
     const data={siteId:site._id,name,trade:trade||'',employeeCompanyName:empCompany,carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date,reason:reason||''};
     if (req.file) data.imageUrl=`/uploads/${project_code.trim().toUpperCase()}/${req.file.filename}`;
     const log=await ActivityLog.create(data);
@@ -65,7 +65,7 @@ router.post('/manual', verifyToken, async (req,res) => {
   let hours=0;
   if (time_out){ const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`); hours=parseFloat(((ms<0?ms+86400000:ms||86400000)/3600000).toFixed(2)); }
   try {
-    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    const empCompany = employee_company_name ? employee_company_name.trim() : null;
     await ActivityLog.create({siteId:project_id,name,trade:trade||'',employeeCompanyName:empCompany,carReg:car_reg||'',userType:user_type||'Employee',timeIn:time_in,timeOut:time_out||null,hours,date});
     res.json({success:true,message:'Log created manually'});
   } catch(err){ res.status(500).json({error:'Server error'}); }
@@ -119,7 +119,7 @@ router.put('/:id', verifyToken, async (req,res) => {
   try {
     const ms=new Date(`${date}T${time_out}`)-new Date(`${date}T${time_in}`);
     const hours=parseFloat(((ms<0?ms+86400000:ms||86400000)/3600000).toFixed(2));
-    const empCompany = (user_type === 'Employee' && employee_company_name) ? employee_company_name.trim() : null;
+    const empCompany = employee_company_name ? employee_company_name.trim() : null;
     await ActivityLog.findByIdAndUpdate(req.params.id,{name,trade,employeeCompanyName:empCompany,carReg:car_reg,userType:user_type,timeIn:time_in,timeOut:time_out,hours,reason,date});
     res.json({success:true,message:'Log updated'});
   } catch(err){ res.status(500).json({error:'Server error'}); }

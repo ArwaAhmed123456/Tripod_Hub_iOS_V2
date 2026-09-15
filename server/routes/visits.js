@@ -114,7 +114,7 @@ router.post('/public', async (req, res) => {
     const dateStr = now.toISOString().split('T')[0];
     const imageUrl = photo_base64 ? savePhoto(photo_base64) : null;
     const userType = group || 'Visitor';
-    const empCompany = (String(userType).toLowerCase().includes('employee') && employee_company_name) ? employee_company_name.trim() : null;
+    const empCompany = employee_company_name ? employee_company_name.trim() : null;
 
     const log = await ActivityLog.create({
       siteId: site._id, name: name.trim(),
@@ -237,7 +237,7 @@ router.post('/', async (req, res) => {
       if (m) displayName = `${m.firstName} ${m.lastName || ''}`.trim();
     }
     const userType = group || 'Visitor';
-    const empCompany = (String(userType).toLowerCase().includes('employee') && employee_company_name) ? employee_company_name.trim() : null;
+    const empCompany = employee_company_name ? employee_company_name.trim() : null;
 
     const log = await ActivityLog.create({
       siteId: sid, memberId: member_id || null, name: displayName,
@@ -313,10 +313,9 @@ router.put('/:id', verifyAdmin, async (req, res) => {
     }
     if (trade !== undefined) log.trade = trade;
     if (employee_company_name !== undefined || group !== undefined || userType !== undefined) {
-      const activeGroup = String(group || userType || log.userType || '');
-      log.employeeCompanyName = activeGroup.toLowerCase().includes('employee') && employee_company_name
-        ? String(employee_company_name).trim()
-        : null;
+      log.employeeCompanyName = employee_company_name !== undefined
+        ? (employee_company_name ? String(employee_company_name).trim() : null)
+        : log.employeeCompanyName;
     }
     if (car_reg !== undefined || carReg !== undefined) {
       log.carReg = car_reg !== undefined ? car_reg : carReg;
