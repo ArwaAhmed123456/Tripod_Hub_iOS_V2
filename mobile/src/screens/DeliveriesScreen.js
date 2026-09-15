@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Switch,
   Text,
@@ -17,7 +18,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, CalendarDays, Download, FileText, Package, Plus, RefreshCw, Search, X } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
@@ -29,6 +30,15 @@ const formatDate = (value) =>
 
 const formatDateShort = (d) =>
   d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+// DD-MM-YYYY for filenames
+const formatDateFile = (d) => {
+  const date = d || new Date();
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+};
 
 const toApiDate = (d) => {
   if (!d) return '';
@@ -44,11 +54,19 @@ const esc = (v) =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
+// Sanitise a string for use as a filename component
+const safeFilename = (str) =>
+  String(str || 'Site')
+    .replace(/[^a-zA-Z0-9_\- ]/g, '')
+    .replace(/\s+/g, '_')
+    .slice(0, 40);
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function DeliveriesScreen({ navigation, route }) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const siteId = route?.params?.siteId || user?.project_id || user?.site_id;
+  const siteName = route?.params?.siteName || user?.siteName || user?.project_name || 'Site';
 
   // Derive server root URL for building image URLs in PDF (strip trailing /api)
   const SERVER_BASE = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com';
@@ -56,9 +74,9 @@ export default function DeliveriesScreen({ navigation, route }) {
   const [deliveries, setDeliveries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [dateFrom, setDateFrom] = useState(null);   // Date | null
-  const [dateTo, setDateTo]     = useState(null);   // Date | null
-  const [showPicker, setShowPicker] = useState(null); // 'from' | 'to' | null
+  const [dateFrom, setDateFrom] = useState(null);
+  const [dateTo, setDateTo]     = useState(null);
+  const [showPicker, setShowPicker] = useState(null);
   const [selected, setSelected] = useState(null);
   const [detailIncludePhoto, setDetailIncludePhoto] = useState(true);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -102,71 +120,166 @@ export default function DeliveriesScreen({ navigation, route }) {
   const list = useMemo(() => deliveries, [deliveries]);
 
   // ── Export ────────────────────────────────────────────────────────────────
-  const exportReport = async (format, reportItems = list, reportTitle = 'Delivery Report', includePhotos = true) => {
+  const exportReport = async (
+    format,
+    reportItems = list,
+    reportTitle = 'Delivery Report',
+    includePhotos = true,
+  ) => {
     if (!reportItems.length) {
       return Alert.alert('Nothing to export', 'No deliveries match the current filters.');
     }
     setExporting(true);
     try {
-      // ── Report columns match ONLY the mobile DeliveryFormScreen fields ──
+      // ── Report columns ──────────────────────────────────────────────────
+      // recipient = driver/contact name (the "Name" column)
+      // product || itemName = what was delivered (the "Product" column)
+      // supplier || company = who supplied it
       const rows = reportItems
         .map(
-          (d) => `<tr>
-            <td>${esc(d.recipient || '—')}</td><td>${esc(siteId || '—')}</td>
-            <td>${esc(formatDate(d.receivedAt || d.createdAt))}</td>
-            <td>${esc(d.supplier || d.sender || d.company || '—')}</td>
-            <td>${esc(d.carRegistration || d.car_registration || '—')}</td>
-            <td>${esc(d.deliveryDocumentNumber || '—')}</td>
-            <td>${esc(d.product || d.itemName || '—')}</td><td>${esc(d.netWeight || '—')}</td>
+          (d, idx) => `
+          <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">
+            <td style="padding:8px 10px">${esc(d.recipient || d.name || '—')}</td>
+            <td style="padding:8px 10px">${esc(siteName)}</td>
+            <td style="padding:8px 10px;white-space:nowrap">${esc(formatDate(d.receivedAt || d.createdAt))}</td>
+            <td style="padding:8px 10px">${esc(d.supplier || d.company || d.sender || '—')}</td>
+            <td style="padding:8px 10px">${esc(d.carRegistration || d.car_registration || '—')}</td>
+            <td style="padding:8px 10px">${esc(d.deliveryDocumentNumber || '—')}</td>
+            <td style="padding:8px 10px">${esc(d.product || d.itemName || d.item_name || '—')}</td>
+            <td style="padding:8px 10px">${esc(d.netWeight || d.net_weight || '—')}</td>
           </tr>`,
         )
         .join('');
 
-      // Delivery picture section — only rendered when includePhotos is TRUE and image exists
+      // ── Delivery picture section ─────────────────────────────────────────
       const singleDelivery = reportItems.length === 1 ? reportItems[0] : null;
       let imageSection = '';
       if (includePhotos && singleDelivery?.deliveryImageUrl) {
-        imageSection = `<div style="margin-top:28px">
-            <h3 style="font-size:14px;color:#374151;margin-bottom:10px">Delivery Picture</h3>
+        imageSection = `
+          <div style="margin-top:28px;page-break-inside:avoid">
+            <h3 style="font-size:13px;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Delivery Picture</h3>
             <img src="${SERVER_BASE}${singleDelivery.deliveryImageUrl}"
-              style="max-width:400px;max-height:300px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
-           </div>`;
+              style="max-width:400px;max-height:280px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
+          </div>`;
       } else if (includePhotos && reportItems.length > 1) {
-        const deliveriesWithPics = reportItems.filter(d => d.deliveryImageUrl);
-        if (deliveriesWithPics.length > 0) {
-          imageSection = `<div style="margin-top:32px;page-break-before:always">
-            <h3 style="font-size:16px;color:#111827;margin-bottom:14px">Attached Delivery Pictures</h3>
+        const withPics = reportItems.filter((d) => d.deliveryImageUrl);
+        if (withPics.length > 0) {
+          imageSection = `
+          <div style="margin-top:32px;page-break-before:always">
+            <h3 style="font-size:15px;color:#111827;margin-bottom:14px">Attached Delivery Pictures</h3>
             <div style="display:flex;flex-wrap:wrap;gap:16px">
-              ${deliveriesWithPics.map(d => `
-                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:280px">
-                  <div style="font-size:12px;font-weight:bold;margin-bottom:6px">${esc(d.itemName || d.item_name || 'Item')} — ${esc(d.company || '—')}</div>
-                  <img src="${SERVER_BASE}${d.deliveryImageUrl}" style="width:100%;height:180px;object-fit:cover;border-radius:6px" />
-                </div>
-              `).join('')}
+              ${withPics.map((d) => `
+                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:260px;page-break-inside:avoid">
+                  <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:6px">
+                    ${esc(d.recipient || d.name || '—')} — ${esc(d.supplier || d.company || '—')}
+                  </div>
+                  <img src="${SERVER_BASE}${d.deliveryImageUrl}"
+                    style="width:100%;height:170px;object-fit:cover;border-radius:6px" />
+                </div>`).join('')}
             </div>
           </div>`;
         }
       }
 
-      const html = `<html><body style="font-family:Arial;padding:24px;color:#111827">
-        <div style="display:flex;align-items:center;gap:14px;border-bottom:3px solid #2b4594;padding-bottom:12px"><img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" style="height:44px;max-width:150px;object-fit:contain" /><div><h2 style="margin:0">${esc(reportTitle)}</h2><p style="margin:4px 0;color:#64748b">Generated ${esc(new Date().toLocaleString('en-GB'))}</p></div></div>
-        <p>Period: ${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}</p>
-        <table style="width:100%;border-collapse:collapse" border="1" cellpadding="7">
-          <thead><tr style="background:#f8fafc;font-weight:bold">
-            <th>Name</th><th>Site / Project</th><th>Date / Time</th><th>Supplier</th><th>Vehicle Reg</th><th>Delivery Document Number</th><th>Product</th><th>Net Weight</th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        ${imageSection}
-      </body></html>`;
+      // ── Period label ─────────────────────────────────────────────────────
+      const periodLabel =
+        dateFrom || dateTo
+          ? `${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}`
+          : 'All dates';
+
+      // ── Full HTML ────────────────────────────────────────────────────────
+      const generatedOn = new Date().toLocaleString('en-GB', {
+        dateStyle: 'long', timeStyle: 'short',
+      });
+      const totalRows = reportItems.length;
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page { margin: 20mm 15mm; size: A4 landscape; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .footer { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ── -->
+  <div style="display:flex;align-items:center;gap:16px;border-bottom:3px solid #1e3a8a;padding-bottom:14px;margin-bottom:16px">
+    <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png"
+      style="height:48px;max-width:160px;object-fit:contain" />
+    <div style="flex:1">
+      <h2 style="margin:0;font-size:20px;color:#111827">${esc(reportTitle)}</h2>
+      <p style="margin:3px 0 0;font-size:11px;color:#64748b">
+        ${esc(siteName)} &nbsp;·&nbsp; Period: ${esc(periodLabel)} &nbsp;·&nbsp; Generated ${esc(generatedOn)}
+      </p>
+    </div>
+    <div style="text-align:right;font-size:11px;color:#64748b">
+      <div style="font-size:20px;font-weight:bold;color:#1e3a8a">${totalRows}</div>
+      <div>record${totalRows !== 1 ? 's' : ''}</div>
+    </div>
+  </div>
+
+  <!-- ── Table ── -->
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Site / Project</th>
+        <th>Date / Time</th>
+        <th>Supplier</th>
+        <th>Vehicle Reg</th>
+        <th>Delivery Doc No.</th>
+        <th>Product</th>
+        <th>Net Weight</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+
+  ${imageSection}
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <span>Tripod Hub &nbsp;·&nbsp; Delivery Report</span>
+    <span>${esc(siteName)}</span>
+    <span>Generated ${esc(generatedOn)}</span>
+  </div>
+
+</body>
+</html>`;
 
       if (format === 'pdf') {
-        const { uri } = await Print.printToFileAsync({ html });
-        await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Delivery report (PDF)' });
+        // Generate to a temp URI first, then copy with a descriptive name
+        const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+
+        const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
+        const destUri  = FileSystem.cacheDirectory + filename;
+
+        await FileSystem.copyAsync({ from: tempUri, to: destUri });
+
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/pdf',
+          dialogTitle: 'Delivery Report (PDF)',
+          UTI:         'com.adobe.pdf',
+        });
       } else {
-        const file = new File(Paths.cache, 'delivery-report.xls');
-        await file.writeAsStringAsync(html);
-        await Sharing.shareAsync(file.uri, { mimeType: 'application/vnd.ms-excel', dialogTitle: 'Delivery report (Excel)' });
+        // Excel — named file
+        const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.xls`;
+        const destUri  = FileSystem.cacheDirectory + filename;
+
+        await FileSystem.writeAsStringAsync(destUri, html, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/vnd.ms-excel',
+          dialogTitle: 'Delivery Report (Excel)',
+        });
       }
     } catch (err) {
       Alert.alert('Export failed', err.message || 'Could not create the report.');
@@ -175,11 +288,16 @@ export default function DeliveriesScreen({ navigation, route }) {
     }
   };
 
-  // ── Delivery detail sheet ───────────────────────────────────────────────
+  // ── Delivery detail sheet ─────────────────────────────────────────────────
   const renderDetail = (d) => (
     <Modal visible={!!d} transparent animationType="slide" onRequestClose={() => setSelected(null)}>
       <View style={s.overlay}>
-        <View style={s.sheet}>
+        <ScrollView
+          style={s.sheet}
+          contentContainerStyle={{ paddingBottom: 36 }}
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+        >
           <View style={s.detailHeader}>
             <Text style={s.detailTitle}>Delivery Details</Text>
             <TouchableOpacity onPress={() => setSelected(null)}>
@@ -188,25 +306,31 @@ export default function DeliveriesScreen({ navigation, route }) {
           </View>
 
           <View style={s.packageIcon}><Package size={30} color="#c2410c" /></View>
-          <Text style={s.itemTitle}>{d?.itemName || d?.recipient || 'Delivery'}</Text>
-          <Text style={s.status}>{d?.collected ? '✓ Collected' : '⏳ Pending collection'}</Text>
 
+          {/* Title shows the PRODUCT, not the name */}
+          <Text style={s.itemTitle}>{d?.product || d?.itemName || d?.item_name || 'Delivery'}</Text>
+          <Text style={s.itemSub}>{d?.recipient || d?.name || ''}</Text>
+
+          {/* ── Only current DeliveryFormScreen fields — no Status, no Collected At ── */}
           {[
-            // ── Only fields that match the mobile DeliveryFormScreen form ──
-            ['Item Name',       d?.itemName],
-            ['Company',         d?.company],
-            ['Description',     d?.description || d?.notes],
-            ['Car Registration', d?.carRegistration || d?.car_registration],
-            ['Received',        formatDate(d?.receivedAt || d?.createdAt)],
-            ['Collected At',    d?.collected ? formatDate(d?.collectedAt) : 'Not yet collected'],
-          ].map(([label, value]) => (
-            <View key={label} style={s.detailRow}>
-              <Text style={s.detailLabel}>{label}</Text>
-              <Text style={s.detailValue}>{value || '—'}</Text>
-            </View>
-          ))}
+            ['Name',                    d?.recipient || d?.name],
+            ['Supplier',                d?.supplier || d?.company || d?.sender],
+            ['Product',                 d?.product || d?.itemName || d?.item_name],
+            ['Vehicle Registration',    d?.carRegistration || d?.car_registration],
+            ['Delivery Document No.',   d?.deliveryDocumentNumber || d?.delivery_document_number],
+            ['Net Weight',              d?.netWeight || d?.net_weight],
+            ['Description',             d?.description || d?.notes],
+            ['Date / Time',             formatDate(d?.receivedAt || d?.createdAt)],
+          ]
+            .filter(([, value]) => value)   // hide empty rows
+            .map(([label, value]) => (
+              <View key={label} style={s.detailRow}>
+                <Text style={s.detailLabel}>{label}</Text>
+                <Text style={s.detailValue}>{String(value)}</Text>
+              </View>
+            ))}
 
-          {/* Delivery Picture — only shown when an image was captured */}
+          {/* Delivery picture */}
           {d?.deliveryImageUrl ? (
             <View style={s.detailImageSection}>
               <Text style={s.detailLabel}>Delivery Picture</Text>
@@ -231,8 +355,14 @@ export default function DeliveriesScreen({ navigation, route }) {
             style={s.detailExport}
             onPress={() =>
               Alert.alert('Download this delivery', 'Choose a format', [
-                { text: 'PDF', onPress: () => exportReport('pdf', [d], 'Delivery Details', detailIncludePhoto) },
-                { text: 'Excel (.xls)', onPress: () => exportReport('excel', [d], 'Delivery Details', false) },
+                {
+                  text: 'PDF',
+                  onPress: () => exportReport('pdf', [d], 'Delivery Details', detailIncludePhoto),
+                },
+                {
+                  text: 'Excel (.xls)',
+                  onPress: () => exportReport('excel', [d], 'Delivery Details', false),
+                },
                 { text: 'Cancel', style: 'cancel' },
               ])
             }
@@ -240,7 +370,7 @@ export default function DeliveriesScreen({ navigation, route }) {
             <Download size={18} color="#fff" />
             <Text style={s.buttonText}>Download Details</Text>
           </TouchableOpacity>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -272,7 +402,6 @@ export default function DeliveriesScreen({ navigation, route }) {
 
       {/* Filters */}
       <View style={s.filters}>
-        {/* Search */}
         <View style={s.searchRow}>
           <Search size={16} color="#64748b" />
           <TextInput
@@ -289,7 +418,6 @@ export default function DeliveriesScreen({ navigation, route }) {
           ) : null}
         </View>
 
-        {/* Date range pickers */}
         <View style={s.dateRow}>
           <TouchableOpacity style={s.dateInput} onPress={() => setShowPicker('from')}>
             <CalendarDays size={15} color="#2b4594" />
@@ -297,7 +425,10 @@ export default function DeliveriesScreen({ navigation, route }) {
               {dateFrom ? formatDateShort(dateFrom) : 'From date'}
             </Text>
             {dateFrom ? (
-              <TouchableOpacity onPress={() => setDateFrom(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => setDateFrom(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <X size={13} color="#94a3b8" />
               </TouchableOpacity>
             ) : null}
@@ -309,14 +440,16 @@ export default function DeliveriesScreen({ navigation, route }) {
               {dateTo ? formatDateShort(dateTo) : 'To date'}
             </Text>
             {dateTo ? (
-              <TouchableOpacity onPress={() => setDateTo(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => setDateTo(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <X size={13} color="#94a3b8" />
               </TouchableOpacity>
             ) : null}
           </TouchableOpacity>
         </View>
 
-        {/* Download filtered report button */}
         <TouchableOpacity
           disabled={exporting}
           onPress={() => setShowExportModal(true)}
@@ -334,7 +467,12 @@ export default function DeliveriesScreen({ navigation, route }) {
       </View>
 
       {/* Export Options Modal */}
-      <Modal visible={showExportModal} transparent animationType="fade" onRequestClose={() => setShowExportModal(false)}>
+      <Modal
+        visible={showExportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExportModal(false)}
+      >
         <View style={s.modalBackdrop}>
           <View style={s.modalCard}>
             <View style={s.modalHeader}>
@@ -350,13 +488,17 @@ export default function DeliveriesScreen({ navigation, route }) {
                 style={[s.formatBtn, exportFormat === 'pdf' && s.formatBtnActive]}
                 onPress={() => setExportFormat('pdf')}
               >
-                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>PDF Document</Text>
+                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>
+                  PDF Document
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.formatBtn, exportFormat === 'excel' && s.formatBtnActive]}
                 onPress={() => setExportFormat('excel')}
               >
-                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>Excel (.xls)</Text>
+                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>
+                  Excel (.xls)
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -385,7 +527,7 @@ export default function DeliveriesScreen({ navigation, route }) {
         </View>
       </Modal>
 
-      {/* Native date picker (renders as dialog on Android, inline on iOS) */}
+      {/* Native date picker */}
       {showPicker ? (
         <DateTimePicker
           value={showPicker === 'from' ? (dateFrom || new Date()) : (dateTo || new Date())}
@@ -416,12 +558,24 @@ export default function DeliveriesScreen({ navigation, route }) {
             </>
           }
           renderItem={({ item }) => (
-            <TouchableOpacity style={s.card} onPress={() => setSelected(item)} activeOpacity={0.75}>
+            <TouchableOpacity
+              style={s.card}
+              onPress={() => setSelected(item)}
+              activeOpacity={0.75}
+            >
               <View style={s.icon}><Package size={20} color="#c2410c" /></View>
               <View style={s.meta}>
-                <Text style={s.name}>{item.itemName || item.recipient || 'Delivery'}</Text>
+                {/* Card title = PRODUCT; sub = driver name */}
+                <Text style={s.name}>
+                  {item.product || item.itemName || item.item_name || 'Delivery'}
+                </Text>
                 <Text style={s.sub}>
-                  For {item.recipient || 'site reception'}{item.company ? ` · ${item.company}` : ''}
+                  {item.recipient || item.name
+                    ? `From ${item.recipient || item.name}`
+                    : ''}
+                  {(item.supplier || item.company)
+                    ? ` · ${item.supplier || item.company}`
+                    : ''}
                 </Text>
                 <Text style={s.date}>{formatDate(item.receivedAt || item.createdAt)}</Text>
               </View>
@@ -434,7 +588,7 @@ export default function DeliveriesScreen({ navigation, route }) {
       {/* Delivery detail modal */}
       {renderDetail(selected)}
 
-      {/* Add Delivery FAB — positioned above bottom nav using safe-area insets */}
+      {/* Add Delivery FAB */}
       <TouchableOpacity
         style={[s.add, { bottom: insets.bottom + 16 }]}
         onPress={() => navigation.navigate('DeliveryForm', { siteId })}
@@ -448,56 +602,59 @@ export default function DeliveriesScreen({ navigation, route }) {
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page:         { flex: 1, backgroundColor: '#f8fafc' },
-  header:       { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  title:        { flex: 1, fontSize: 19, fontWeight: '800', color: '#111827' },
-  filters:      { padding: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e5e7eb' },
-  searchRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, height: 43 },
-  searchInput:  { flex: 1, fontSize: 14, color: '#111827' },
-  dateRow:      { flexDirection: 'row', gap: 8, marginTop: 8 },
-  dateInput:    { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: '#f9fafb' },
-  dateText:     { flex: 1, fontSize: 13, color: '#111827', fontWeight: '500' },
+  page:            { flex: 1, backgroundColor: '#f8fafc' },
+  header:          { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 18, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e5e7eb' },
+  title:           { flex: 1, fontSize: 19, fontWeight: '800', color: '#111827' },
+  filters:         { padding: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#e5e7eb' },
+  searchRow:       { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, height: 43 },
+  searchInput:     { flex: 1, fontSize: 14, color: '#111827' },
+  dateRow:         { flexDirection: 'row', gap: 8, marginTop: 8 },
+  dateInput:       { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: '#cbd5e1', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 9, backgroundColor: '#f9fafb' },
+  dateText:        { flex: 1, fontSize: 13, color: '#111827', fontWeight: '500' },
   datePlaceholder: { color: '#94a3b8', fontWeight: '400' },
-  reportBtn:    { marginTop: 9, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 10, backgroundColor: '#eef2ff' },
-  reportText:   { fontWeight: '700', fontSize: 13, color: '#2b4594' },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list:         { padding: 16 },
-  empty:        { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  emptyTitle:   { marginTop: 14, fontSize: 17, fontWeight: '700', color: '#334155' },
-  emptyCopy:    { marginTop: 6, fontSize: 14, color: '#64748b', textAlign: 'center' },
-  card:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
-  icon:         { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center' },
-  meta:         { flex: 1 },
-  name:         { fontSize: 15, fontWeight: '700', color: '#111827' },
-  sub:          { fontSize: 13, color: '#475569', marginTop: 2 },
-  date:         { fontSize: 12, color: '#94a3b8', marginTop: 4 },
-  add:          { position: 'absolute', right: 20, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2b4594', borderRadius: 28, paddingHorizontal: 18, paddingVertical: 14, elevation: 6, shadowColor: '#2b4594', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
-  addText:      { color: '#fff', fontWeight: '800', fontSize: 15 },
-  overlay:      { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheet:        { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, paddingBottom: 36, maxHeight: '90%' },
-  detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-  detailTitle:  { fontSize: 19, fontWeight: '800', color: '#111827' },
-  packageIcon:  { marginTop: 16, width: 54, height: 54, borderRadius: 16, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center' },
-  itemTitle:    { fontSize: 20, fontWeight: '800', marginTop: 10, color: '#111827' },
-  status:       { color: '#b45309', fontWeight: '700', marginTop: 3, marginBottom: 8 },
-  detailRow:    { paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f1f5f9' },
-  detailLabel:  { fontSize: 11, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
-  detailValue:  { fontSize: 15, color: '#111827', marginTop: 2 },
+  reportBtn:       { marginTop: 9, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7, paddingVertical: 10, borderRadius: 10, backgroundColor: '#eef2ff' },
+  reportText:      { fontWeight: '700', fontSize: 13, color: '#2b4594' },
+  center:          { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list:            { padding: 16 },
+  empty:           { flexGrow: 1, alignItems: 'center', justifyContent: 'center', padding: 28 },
+  emptyTitle:      { marginTop: 14, fontSize: 17, fontWeight: '700', color: '#334155' },
+  emptyCopy:       { marginTop: 6, fontSize: 14, color: '#64748b', textAlign: 'center' },
+  card:            { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#e5e7eb' },
+  icon:            { width: 42, height: 42, borderRadius: 12, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center' },
+  meta:            { flex: 1 },
+  name:            { fontSize: 15, fontWeight: '700', color: '#111827' },
+  sub:             { fontSize: 13, color: '#475569', marginTop: 2 },
+  date:            { fontSize: 12, color: '#94a3b8', marginTop: 4 },
+  add:             { position: 'absolute', right: 20, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#2b4594', borderRadius: 28, paddingHorizontal: 18, paddingVertical: 14, elevation: 6, shadowColor: '#2b4594', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 },
+  addText:         { color: '#fff', fontWeight: '800', fontSize: 15 },
+  // Detail modal
+  overlay:         { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+  sheet:           { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, maxHeight: '90%' },
+  detailHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  detailTitle:     { fontSize: 19, fontWeight: '800', color: '#111827' },
+  packageIcon:     { marginTop: 16, width: 54, height: 54, borderRadius: 16, backgroundColor: '#fff7ed', alignItems: 'center', justifyContent: 'center' },
+  itemTitle:       { fontSize: 20, fontWeight: '800', marginTop: 10, color: '#111827' },
+  itemSub:         { fontSize: 14, color: '#64748b', marginTop: 2, marginBottom: 8 },
+  status:          { color: '#b45309', fontWeight: '700', marginTop: 3, marginBottom: 8 },
+  detailRow:       { paddingVertical: 10, borderBottomWidth: 1, borderColor: '#f1f5f9' },
+  detailLabel:     { fontSize: 11, color: '#64748b', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  detailValue:     { fontSize: 15, color: '#111827', marginTop: 2 },
   detailImageSection: { marginTop: 14, marginBottom: 4 },
-  detailImage:  { width: '100%', height: 200, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
-  photoToggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
-  photoToggleLabel: { fontSize: 13, fontWeight: '600', color: '#334155' },
-  detailExport: { backgroundColor: '#2b4594', borderRadius: 12, padding: 14, marginTop: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  buttonText:   { color: '#fff', fontWeight: '800', fontSize: 15 },
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalCard:    { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 22, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
-  modalHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  modalTitle:   { fontSize: 18, fontWeight: '800', color: '#111827' },
-  formatRow:    { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 16 },
-  formatBtn:    { flex: 1, paddingVertical: 11, borderWidth: 1.5, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center' },
+  detailImage:     { width: '100%', height: 200, borderRadius: 12, marginTop: 8, borderWidth: 1, borderColor: '#e2e8f0', backgroundColor: '#f8fafc' },
+  photoToggleRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#f8fafc', borderRadius: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  photoToggleLabel:{ fontSize: 13, fontWeight: '600', color: '#334155' },
+  detailExport:    { backgroundColor: '#2b4594', borderRadius: 12, padding: 14, marginTop: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
+  buttonText:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  // Export modal
+  modalBackdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  modalCard:       { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 22, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  modalHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle:      { fontSize: 18, fontWeight: '800', color: '#111827' },
+  formatRow:       { flexDirection: 'row', gap: 10, marginTop: 12, marginBottom: 16 },
+  formatBtn:       { flex: 1, paddingVertical: 11, borderWidth: 1.5, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center' },
   formatBtnActive: { borderColor: '#2b4594', backgroundColor: '#eff6ff' },
-  formatBtnText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  formatBtnText:   { fontSize: 13, fontWeight: '700', color: '#64748b' },
   formatBtnTextActive: { color: '#2b4594' },
-  confirmBtn:   { backgroundColor: '#2b4594', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 16 },
-  confirmBtnText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  confirmBtn:      { backgroundColor: '#2b4594', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 16 },
+  confirmBtnText:  { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
