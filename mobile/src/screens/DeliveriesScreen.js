@@ -18,7 +18,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, CalendarDays, Download, FileText, Package, Plus, RefreshCw, Search, X } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
@@ -28,8 +28,38 @@ import api from '../services/api';
 const formatDate = (value) =>
   value ? new Date(value).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
 
+// Extract just the date portion: "15 Sep 2026"
+const fmtDateOnly = (value) =>
+  value ? new Date(value).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+// Extract just the time portion: "14:35"
+const fmtTimeOnly = (value) =>
+  value ? new Date(value).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+
+// Compute duration in minutes between two ISO timestamps; returns "47 min" or "—"
+const fmtDuration = (from, to) => {
+  if (!from || !to) return '—';
+  const ms = new Date(to).getTime() - new Date(from).getTime();
+  if (ms <= 0) return '—';
+  const totalMin = Math.round(ms / 60000);
+  const hrs  = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins} min`;
+};
+
 const formatDateShort = (d) =>
   d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+const formatDateTimeCell = (value) =>
+  value
+    ? new Date(value).toLocaleString('en-GB', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '—';
 
 // DD-MM-YYYY for filenames
 const formatDateFile = (d) => {
@@ -60,6 +90,13 @@ const safeFilename = (str) =>
     .replace(/[^a-zA-Z0-9_\- ]/g, '')
     .replace(/\s+/g, '_')
     .slice(0, 40);
+
+const getDeliveryName = (delivery) => delivery?.recipient || delivery?.name || '—';
+const getDeliverySupplier = (delivery) => delivery?.supplier || delivery?.company || delivery?.sender || '—';
+const getDeliveryProduct = (delivery) => delivery?.product || delivery?.itemName || delivery?.item_name || '—';
+const getVehicleRegistration = (delivery) => delivery?.carRegistration || delivery?.car_registration || '—';
+const getDeliveryDocumentNumber = (delivery) => delivery?.deliveryDocumentNumber || delivery?.delivery_document_number || '—';
+const getNetWeight = (delivery) => delivery?.netWeight || delivery?.net_weight || '—';
 
 // ── Component ──────────────────────────────────────────────────────────────
 export default function DeliveriesScreen({ navigation, route }) {
@@ -132,22 +169,26 @@ export default function DeliveriesScreen({ navigation, route }) {
     setExporting(true);
     try {
       // ── Report columns ──────────────────────────────────────────────────
-      // recipient = driver/contact name (the "Name" column)
-      // product || itemName = what was delivered (the "Product" column)
-      // supplier || company = who supplied it
+      // Use only the current Delivery Report field set and avoid legacy
+      // collection/status fields from the previous template.
       const rows = reportItems
         .map(
-          (d, idx) => `
+          (d, idx) => {
+            const arrival = d.receivedAt || d.createdAt;
+            return `
           <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">
-            <td style="padding:8px 10px">${esc(d.recipient || d.name || '—')}</td>
+            <td style="padding:8px 10px">${esc(getDeliveryName(d))}</td>
             <td style="padding:8px 10px">${esc(siteName)}</td>
-            <td style="padding:8px 10px;white-space:nowrap">${esc(formatDate(d.receivedAt || d.createdAt))}</td>
-            <td style="padding:8px 10px">${esc(d.supplier || d.company || d.sender || '—')}</td>
-            <td style="padding:8px 10px">${esc(d.carRegistration || d.car_registration || '—')}</td>
-            <td style="padding:8px 10px">${esc(d.deliveryDocumentNumber || '—')}</td>
-            <td style="padding:8px 10px">${esc(d.product || d.itemName || d.item_name || '—')}</td>
-            <td style="padding:8px 10px">${esc(d.netWeight || d.net_weight || '—')}</td>
-          </tr>`,
+            <td style="padding:8px 10px;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
+            <td style="padding:8px 10px;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
+            <td style="padding:8px 10px">${esc(fmtDuration(arrival, d.collectedAt) )}</td>
+            <td style="padding:8px 10px">${esc(getDeliverySupplier(d))}</td>
+            <td style="padding:8px 10px">${esc(getVehicleRegistration(d))}</td>
+            <td style="padding:8px 10px">${esc(getDeliveryDocumentNumber(d))}</td>
+            <td style="padding:8px 10px">${esc(getDeliveryProduct(d))}</td>
+            <td style="padding:8px 10px">${esc(getNetWeight(d))}</td>
+          </tr>`;
+          },
         )
         .join('');
 
@@ -171,7 +212,7 @@ export default function DeliveriesScreen({ navigation, route }) {
               ${withPics.map((d) => `
                 <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:260px;page-break-inside:avoid">
                   <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:6px">
-                    ${esc(d.recipient || d.name || '—')} — ${esc(d.supplier || d.company || '—')}
+                    ${esc(getDeliveryName(d))} — ${esc(getDeliverySupplier(d))}
                   </div>
                   <img src="${SERVER_BASE}${d.deliveryImageUrl}"
                     style="width:100%;height:170px;object-fit:cover;border-radius:6px" />
@@ -192,63 +233,81 @@ export default function DeliveriesScreen({ navigation, route }) {
         dateStyle: 'long', timeStyle: 'short',
       });
       const totalRows = reportItems.length;
+      const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
 
       const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8" />
+  <title>${esc(filename)}</title>
   <style>
     @page { margin: 20mm 15mm; size: A4 landscape; }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
+    .report-shell { padding-bottom: 64px; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    .footer { margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 10px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; }
+    .report-head { display:flex; align-items:center; gap:16px; border-bottom:3px solid #1e3a8a; padding-bottom:14px; margin-bottom:16px; }
+    .report-head img { height:52px; max-width:170px; object-fit:contain; }
+    .report-head-copy { flex:1; }
+    .company-name { margin:0 0 4px; font-size:12px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#1e3a8a; }
+    .report-title { margin:0; font-size:22px; color:#111827; }
+    .report-meta { margin:4px 0 0; font-size:11px; color:#64748b; }
+    .report-count { text-align:right; font-size:11px; color:#64748b; }
+    .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
+    .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
 <body>
+  <div class="report-shell">
+    <!-- ── Header ── -->
+    <div class="report-head">
+      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <div class="report-head-copy">
+        <p class="company-name">Tripod Services</p>
+        <h2 class="report-title">${esc(reportTitle)}</h2>
+        <p class="report-meta">
+          ${esc(siteName)} &nbsp;·&nbsp; Period: ${esc(periodLabel)} &nbsp;·&nbsp; Generated ${esc(generatedOn)}
+        </p>
+      </div>
+      <div class="report-count">
+        <strong>${totalRows}</strong>
+        <div>record${totalRows !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
 
-  <!-- ── Header ── -->
-  <div style="display:flex;align-items:center;gap:16px;border-bottom:3px solid #1e3a8a;padding-bottom:14px;margin-bottom:16px">
-    <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png"
-      style="height:48px;max-width:160px;object-fit:contain" />
-    <div style="flex:1">
-      <h2 style="margin:0;font-size:20px;color:#111827">${esc(reportTitle)}</h2>
-      <p style="margin:3px 0 0;font-size:11px;color:#64748b">
-        ${esc(siteName)} &nbsp;·&nbsp; Period: ${esc(periodLabel)} &nbsp;·&nbsp; Generated ${esc(generatedOn)}
-      </p>
-    </div>
-    <div style="text-align:right;font-size:11px;color:#64748b">
-      <div style="font-size:20px;font-weight:bold;color:#1e3a8a">${totalRows}</div>
-      <div>record${totalRows !== 1 ? 's' : ''}</div>
-    </div>
+    <!-- ── Table ── -->
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Site / Project</th>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Duration</th>
+          <th>Supplier</th>
+          <th>Vehicle Reg</th>
+          <th>Delivery Doc No.</th>
+          <th>Product</th>
+          <th>Net Weight</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+
+    ${imageSection}
+
+    <div class="report-end">End of report</div>
   </div>
-
-  <!-- ── Table ── -->
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Site / Project</th>
-        <th>Date / Time</th>
-        <th>Supplier</th>
-        <th>Vehicle Reg</th>
-        <th>Delivery Doc No.</th>
-        <th>Product</th>
-        <th>Net Weight</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-
-  ${imageSection}
 
   <!-- ── Footer ── -->
   <div class="footer">
-    <span>Tripod Hub &nbsp;·&nbsp; Delivery Report</span>
+    <span>Tripod Services &nbsp;·&nbsp; Official Delivery Report</span>
     <span>${esc(siteName)}</span>
-    <span>Generated ${esc(generatedOn)}</span>
+    <span class="page-number"></span>
   </div>
 
 </body>
@@ -257,10 +316,9 @@ export default function DeliveriesScreen({ navigation, route }) {
       if (format === 'pdf') {
         // Generate to a temp URI first, then copy with a descriptive name
         const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+        const destUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
 
-        const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
-        const destUri  = FileSystem.cacheDirectory + filename;
-
+        await FileSystem.deleteAsync(destUri, { idempotent: true });
         await FileSystem.copyAsync({ from: tempUri, to: destUri });
 
         await Sharing.shareAsync(destUri, {
@@ -320,7 +378,8 @@ export default function DeliveriesScreen({ navigation, route }) {
             ['Delivery Document No.',   d?.deliveryDocumentNumber || d?.delivery_document_number],
             ['Net Weight',              d?.netWeight || d?.net_weight],
             ['Description',             d?.description || d?.notes],
-            ['Date / Time',             formatDate(d?.receivedAt || d?.createdAt)],
+            ['Date',                    fmtDateOnly(d?.receivedAt || d?.createdAt)],
+            ['Time',                    fmtTimeOnly(d?.receivedAt || d?.createdAt)],
           ]
             .filter(([, value]) => value)   // hide empty rows
             .map(([label, value]) => (

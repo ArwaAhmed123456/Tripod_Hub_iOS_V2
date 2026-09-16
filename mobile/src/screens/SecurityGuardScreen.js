@@ -14,11 +14,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { CalendarDays, ChevronDown, Download, LogIn, LogOut, RefreshCw, Search, ShieldCheck, X, Bell, Package } from 'lucide-react-native';
+import { CalendarDays, Check, ChevronDown, Download, LogIn, LogOut, RefreshCw, Search, ShieldCheck, X, Bell, Package } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import {
@@ -42,6 +42,34 @@ const toApiDate = (d) => {
 
 const formatDateShort = (d) =>
   d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+
+// Extract just the date: "16 Sep 2026"
+const fmtDateOnly = (val) =>
+  val ? new Date(val).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+// Extract just the time: "09:15"
+const fmtTimeOnly = (val) =>
+  val ? new Date(val).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+
+// Compute duration between two timestamps: returns "2h 15m", "45 min", or "—"
+const fmtDuration = (from, to) => {
+  if (!from || !to) return '—';
+  const ms = new Date(to).getTime() - new Date(from).getTime();
+  if (ms <= 0) return '—';
+  const totalMin = Math.round(ms / 60000);
+  const hrs = Math.floor(totalMin / 60);
+  const mins = totalMin % 60;
+  return hrs > 0 ? `${hrs}h ${mins}m` : `${mins} min`;
+};
+
+// DD-MM-YYYY for filenames
+const formatDateFile = (d) => {
+  const date = d || new Date();
+  const dd = String(date.getDate()).padStart(2, '0');
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const yyyy = date.getFullYear();
+  return `${dd}-${mm}-${yyyy}`;
+};
 
 const TABS = ['On Site', 'Signed Out', 'Expected'];
 
@@ -248,6 +276,19 @@ const SecurityGuardScreen = ({ navigation }) => {
   const [dateTo, setDateTo]     = useState(null);    // Date | null
   const [showDatePicker, setShowDatePicker] = useState(null); // 'from' | 'to' | null
 
+  // Export report options
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportFormat, setExportFormat] = useState('pdf');
+  const [exportOptionalFields, setExportOptionalFields] = useState({
+    carReg: true,
+    expectedArrival: true,
+    description: true,
+  });
+
+  const toggleOptionalField = (key) => {
+    setExportOptionalFields((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const guardName = user?.name || user?.firstName || 'Security Guard';
 
   const handleLogout = () => {
@@ -310,16 +351,11 @@ const SecurityGuardScreen = ({ navigation }) => {
   };
 
   // ── Export helpers ─────────────────────────────────────────────────────────
-  const fmtExportTime = (val) => {
-    if (!val) return '';
-    try { return new Date(val).toLocaleString('en-GB'); } catch { return val; }
-  };
-
   const safeFilename = (name) =>
-    String(name || 'export')
-      .replace(/[\\/:*?"<>|]+/g, '-')
+    String(name || 'Site')
+      .replace(/[^a-zA-Z0-9_\- ]/g, '')
       .replace(/\s+/g, '_')
-      .slice(0, 140);
+      .slice(0, 40);
 
   const escapeHtml = (value) =>
     String(value ?? '')
@@ -329,52 +365,13 @@ const SecurityGuardScreen = ({ navigation }) => {
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
 
-  const buildHtmlTable = (rows, headers) => {
-    const th = headers.map((h) => `<th style="text-align:left;padding:10px;border:1px solid #e5e7eb;background:#f8fafc">${escapeHtml(h)}</th>`).join('');
-    const tr = rows
-      .map((r) => `<tr>${headers.map((h) => `<td style="padding:10px;border:1px solid #e5e7eb">${escapeHtml(r[h])}</td>`).join('')}</tr>`)
-      .join('');
-    return `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
-  };
-
-  const shareExcel = async ({ title, headers, rows, filenameBase }) => {
-    const table = buildHtmlTable(rows, headers);
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><h2 style="font-family:Arial,sans-serif">${escapeHtml(title)}</h2>${table}</body></html>`;
-    const file = new File(Paths.cache, `${safeFilename(filenameBase)}.xls`);
-    file.write(html);
-    await Sharing.shareAsync(file.uri, {
-      mimeType: 'application/vnd.ms-excel',
-      dialogTitle: 'Export (Excel)',
-    });
-  };
-
-  const sharePdf = async ({ title, headers, rows, filenameBase }) => {
-    const table = buildHtmlTable(rows, headers);
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" />
-      <style>
-        body{font-family:Arial,sans-serif;padding:24px;color:#111827}
-        h2{margin:0 0 12px 0}
-        p{margin:0 0 18px 0;color:#6b7280}
-      </style>
-    </head><body><h2>${escapeHtml(title)}</h2><p>Generated: ${escapeHtml(new Date().toLocaleString('en-GB'))}</p>${table}</body></html>`;
-    const { uri } = await Print.printToFileAsync({ html });
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: 'Export (PDF)',
-      UTI: 'com.adobe.pdf',
-    });
-  };
-
-  const handleExport = async (format) => {
+  const handleExport = async (format = 'pdf', optionalFields = exportOptionalFields) => {
     setExporting(true);
     try {
       const siteName = selectedSite?.name || 'Site';
       const tabName  = activeTab;
-      const dateStr  = new Date().toLocaleDateString('en-GB');
-      const title = `Security Report — ${siteName} — ${tabName}`;
-      const filenameBase = `${siteName}-${tabName}-${dateStr}`;
-
-      const headers = ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company Name', 'Expected Arrival', 'Description'];
+      const SERVER_BASE = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com';
+      const reportTitle = `Security Report — ${tabName}`;
 
       // If date filters are set, fetch a date-filtered list from the API
       let exportList;
@@ -398,21 +395,145 @@ const SecurityGuardScreen = ({ navigation }) => {
         return;
       }
 
-      const rows = exportList.map(item => ({
-        Name:               item.name || '',
-        Role:               item.group || item.visitor_group_name || '',
-        'Sign In':          fmtExportTime(item.sign_in_time),
-        'Sign Out':         fmtExportTime(item.sign_out_time),
-        'Car Registration': item.car_reg || '',
-        'Company Name':     item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '',
-        'Expected Arrival': fmtExportTime(item.expected_date),
-        Description:        item.notes || '',
-      }));
+      // ── Build Dynamic Columns ─────────────────────────────────────────────
+      // Core columns always included:
+      const columns = [
+        { label: 'Date', key: 'date', getVal: (item) => fmtDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
+        { label: 'Name', key: 'name', getVal: (item) => item.name || '—' },
+        { label: 'Role', key: 'role', getVal: (item) => item.group || item.visitor_group_name || '—' },
+        { label: 'Sign In', key: 'signIn', getVal: (item) => fmtTimeOnly(item.sign_in_time) },
+        { label: 'Sign Out', key: 'signOut', getVal: (item) => fmtTimeOnly(item.sign_out_time) },
+        { label: 'Duration', key: 'duration', getVal: (item) => fmtDuration(item.sign_in_time, item.sign_out_time) },
+        { label: 'Company Name', key: 'company', getVal: (item) => item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '—' },
+      ];
 
-      if (format === 'excel') {
-        await shareExcel({ title, headers, rows, filenameBase });
+      // Optional columns based on user checklist selection:
+      if (optionalFields?.carReg) {
+        columns.push({ label: 'Car Registration', key: 'carReg', getVal: (item) => item.car_reg || '—' });
+      }
+      if (optionalFields?.expectedArrival) {
+        columns.push({
+          label: 'Expected Arrival',
+          key: 'expectedArrival',
+          getVal: (item) => item.expected_date ? `${fmtDateOnly(item.expected_date)} ${fmtTimeOnly(item.expected_date)}` : '—',
+        });
+      }
+      if (optionalFields?.description) {
+        columns.push({ label: 'Description', key: 'description', getVal: (item) => item.notes || item.description || item.reason || '—' });
+      }
+
+      const theadHtml = columns
+        .map((col) => `<th>${escapeHtml(col.label)}</th>`)
+        .join('');
+
+      const tbodyHtml = exportList
+        .map((item, idx) => {
+          const cells = columns
+            .map((col) => `<td style="padding:8px 10px">${escapeHtml(col.getVal(item))}</td>`)
+            .join('');
+          return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">${cells}</tr>`;
+        })
+        .join('');
+
+      const periodLabel =
+        dateFrom || dateTo
+          ? `${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}`
+          : 'All dates';
+
+      const generatedOn = new Date().toLocaleString('en-GB', {
+        dateStyle: 'long', timeStyle: 'short',
+      });
+      const totalRows = exportList.length;
+      const filename = `Security_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(filename)}</title>
+  <style>
+    @page { margin: 20mm 15mm; size: A4 landscape; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
+    .report-shell { padding-bottom: 64px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .report-head { display:flex; align-items:center; gap:16px; border-bottom:3px solid #1e3a8a; padding-bottom:14px; margin-bottom:16px; }
+    .report-head img { height:52px; max-width:170px; object-fit:contain; }
+    .report-head-copy { flex:1; }
+    .company-name { margin:0 0 4px; font-size:12px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#1e3a8a; }
+    .report-title { margin:0; font-size:22px; color:#111827; }
+    .report-meta { margin:4px 0 0; font-size:11px; color:#64748b; }
+    .report-count { text-align:right; font-size:11px; color:#64748b; }
+    .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
+    .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    .page-number::after { content: "Page " counter(page); }
+  </style>
+</head>
+<body>
+  <div class="report-shell">
+    <!-- ── Header ── -->
+    <div class="report-head">
+      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <div class="report-head-copy">
+        <p class="company-name">Tripod Services</p>
+        <h2 class="report-title">${escapeHtml(reportTitle)}</h2>
+        <p class="report-meta">
+          ${escapeHtml(siteName)} &nbsp;·&nbsp; Period: ${escapeHtml(periodLabel)} &nbsp;·&nbsp; Generated ${escapeHtml(generatedOn)}
+        </p>
+      </div>
+      <div class="report-count">
+        <strong>${totalRows}</strong>
+        <div>record${totalRows !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
+
+    <!-- ── Table ── -->
+    <table>
+      <thead>
+        <tr>${theadHtml}</tr>
+      </thead>
+      <tbody>${tbodyHtml}</tbody>
+    </table>
+
+    <div class="report-end">End of report</div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <span>Tripod Services &nbsp;·&nbsp; Official Security Report</span>
+    <span>${escapeHtml(siteName)}</span>
+    <span class="page-number"></span>
+  </div>
+
+</body>
+</html>`;
+
+      if (format === 'pdf') {
+        const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+        const destUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
+
+        await FileSystem.deleteAsync(destUri, { idempotent: true });
+        await FileSystem.copyAsync({ from: tempUri, to: destUri });
+
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/pdf',
+          dialogTitle: 'Security Report (PDF)',
+          UTI:         'com.adobe.pdf',
+        });
       } else {
-        await sharePdf({ title, headers, rows, filenameBase });
+        const filename = `Security_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.xls`;
+        const destUri  = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + filename;
+
+        await FileSystem.writeAsStringAsync(destUri, html, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/vnd.ms-excel',
+          dialogTitle: 'Security Report (Excel)',
+        });
       }
     } catch (err) {
       Alert.alert('Export failed', err?.message || 'Could not export data.');
@@ -563,15 +684,7 @@ const SecurityGuardScreen = ({ navigation }) => {
             <LogOut size={18} color="#ef4444" />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => Alert.alert(
-              'Export',
-              'Choose export format',
-              [
-                { text: 'Excel (.xls)', onPress: () => handleExport('excel') },
-                { text: 'PDF', onPress: () => handleExport('pdf') },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            )}
+            onPress={() => setShowExportModal(true)}
             style={[s.refreshBtn, { marginRight: 8 }]}
             disabled={exporting}
           >
@@ -853,6 +966,92 @@ const SecurityGuardScreen = ({ navigation }) => {
         onClose={() => setSelectedPerson(null)}
         person={selectedPerson}
       />
+
+      {/* Export Security Report Modal */}
+      <Modal
+        visible={showExportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowExportModal(false)}
+      >
+        <View style={s.exportModalBackdrop}>
+          <View style={s.exportModalCard}>
+            <View style={s.exportModalHeader}>
+              <Text style={s.exportModalTitle}>Export Security Report</Text>
+              <TouchableOpacity onPress={() => setShowExportModal(false)}>
+                <X size={20} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: '#64748b' }}>Choose file format:</Text>
+            <View style={s.formatRow}>
+              <TouchableOpacity
+                style={[s.formatBtn, exportFormat === 'pdf' && s.formatBtnActive]}
+                onPress={() => setExportFormat('pdf')}
+              >
+                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>
+                  PDF Document
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.formatBtn, exportFormat === 'excel' && s.formatBtnActive]}
+                onPress={() => setExportFormat('excel')}
+              >
+                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>
+                  Excel (.xls)
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 4, marginBottom: 8 }}>
+              Optional Columns to Include:
+            </Text>
+
+            <TouchableOpacity
+              style={s.checkboxRow}
+              onPress={() => toggleOptionalField('carReg')}
+              activeOpacity={0.7}
+            >
+              <View style={[s.checkbox, exportOptionalFields.carReg && s.checkboxChecked]}>
+                {exportOptionalFields.carReg && <Check size={14} color="#fff" strokeWidth={3} />}
+              </View>
+              <Text style={s.checkboxLabel}>Car Registration</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.checkboxRow}
+              onPress={() => toggleOptionalField('expectedArrival')}
+              activeOpacity={0.7}
+            >
+              <View style={[s.checkbox, exportOptionalFields.expectedArrival && s.checkboxChecked]}>
+                {exportOptionalFields.expectedArrival && <Check size={14} color="#fff" strokeWidth={3} />}
+              </View>
+              <Text style={s.checkboxLabel}>Expected Arrival</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.checkboxRow}
+              onPress={() => toggleOptionalField('description')}
+              activeOpacity={0.7}
+            >
+              <View style={[s.checkbox, exportOptionalFields.description && s.checkboxChecked]}>
+                {exportOptionalFields.description && <Check size={14} color="#fff" strokeWidth={3} />}
+              </View>
+              <Text style={s.checkboxLabel}>Description / Notes</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={s.confirmExportBtn}
+              onPress={() => {
+                setShowExportModal(false);
+                handleExport(exportFormat, exportOptionalFields);
+              }}
+            >
+              <Text style={s.confirmExportTxt}>Download Report</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1105,7 +1304,7 @@ const s = StyleSheet.create({
   groupChipText: { fontSize: 13, fontWeight: '600', color: '#475569' },
   groupChipTextActive: { color: '#fff' },
   modalBtns: { flexDirection: 'row', justifyContent: 'flex-end', gap: 14 },
-  modalCancelBtn: { paddingVertical: 10, paddingHorizontal: 16 },
+  modalCancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#e5e7eb', alignItems: 'center' },
   modalCancelTxt: { fontSize: 15, fontWeight: '600', color: '#6b7280' },
   modalConfirmBtn: {
     backgroundColor: '#2b4594',
@@ -1124,6 +1323,23 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   modalConfirmTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  // Export report modal
+  exportModalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
+  exportModalCard: { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 22, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },
+  exportModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  exportModalTitle: { fontSize: 18, fontWeight: '800', color: '#111827' },
+  formatRow: { flexDirection: 'row', gap: 10, marginTop: 10, marginBottom: 14 },
+  formatBtn: { flex: 1, paddingVertical: 11, borderWidth: 1.5, borderColor: '#cbd5e1', borderRadius: 12, alignItems: 'center' },
+  formatBtnActive: { borderColor: '#2b4594', backgroundColor: '#eff6ff' },
+  formatBtnText: { fontSize: 13, fontWeight: '700', color: '#64748b' },
+  formatBtnTextActive: { color: '#2b4594' },
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: '#94a3b8', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  checkboxChecked: { backgroundColor: '#2b4594', borderColor: '#2b4594' },
+  checkboxLabel: { fontSize: 14, color: '#334155', fontWeight: '500' },
+  confirmExportBtn: { backgroundColor: '#2b4594', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 18 },
+  confirmExportTxt: { color: '#fff', fontWeight: '800', fontSize: 15 },
 });
 
 export default SecurityGuardScreen;

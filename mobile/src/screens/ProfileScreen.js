@@ -20,7 +20,9 @@ const ProfileScreen = ({ navigation }) => {
   const [deleting, setDeleting]         = useState(false);
 
   const memberName = user?.name || (user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : null) || user?.email?.split('@')[0] || 'Member';
-  const group      = user?.group || user?.role || 'Employees';
+  const rawGroup   = user?.group || user?.role || 'Employee';
+  // Title-case each word so "guard" → "Guard", "security guard" → "Security Guard"
+  const group      = rawGroup.replace(/\b\w/g, c => c.toUpperCase());
   const org        = user?.organization || 'Observant Security Services';
 
   const handleDisconnect = () => {

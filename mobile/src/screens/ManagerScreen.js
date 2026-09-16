@@ -17,7 +17,7 @@ import {
 import { Bell, CalendarDays, CheckCircle, ChevronDown, Download, MessageSquare, RefreshCw, X, LogOut, UserPlus, Search, Package } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { File, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -269,16 +269,35 @@ const ManagerScreen = ({ navigation, route }) => {
   };
 
   // ── Export ─────────────────────────────────────────────────────────
-  const fmtExportTime = (val) => {
-    if (!val) return '';
-    try { return new Date(val).toLocaleString('en-GB'); } catch { return val; }
+  const fmtExportDateOnly = (val) =>
+    val ? new Date(val).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+  const fmtExportTimeOnly = (val) =>
+    val ? new Date(val).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '—';
+
+  const fmtExportDuration = (from, to) => {
+    if (!from || !to) return '—';
+    const ms = new Date(to).getTime() - new Date(from).getTime();
+    if (ms <= 0) return '—';
+    const totalMin = Math.round(ms / 60000);
+    const hrs = Math.floor(totalMin / 60);
+    const mins = totalMin % 60;
+    return hrs > 0 ? `${hrs}h ${mins}m` : `${mins} min`;
+  };
+
+  const formatDateFile = (d) => {
+    const date = d || new Date();
+    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const yyyy = date.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
   };
 
   const safeFilename = (name) =>
-    String(name || 'export')
-      .replace(/[\\/:*?"<>|]+/g, '-')
+    String(name || 'Site')
+      .replace(/[^a-zA-Z0-9_\- ]/g, '')
       .replace(/\s+/g, '_')
-      .slice(0, 140);
+      .slice(0, 40);
 
   const escapeHtml = (value) =>
     String(value ?? '')
@@ -287,42 +306,6 @@ const ManagerScreen = ({ navigation, route }) => {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
-
-  const buildHtmlTable = (rows, headers) => {
-    const th = headers.map((h) => `<th style="text-align:left;padding:10px;border:1px solid #e5e7eb;background:#f8fafc">${escapeHtml(h)}</th>`).join('');
-    const tr = rows
-      .map((r) => `<tr>${headers.map((h) => `<td style="padding:10px;border:1px solid #e5e7eb">${escapeHtml(r[h])}</td>`).join('')}</tr>`)
-      .join('');
-    return `<table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
-  };
-
-  const shareExcel = async ({ title, headers, rows, filenameBase }) => {
-    const table = buildHtmlTable(rows, headers);
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" /></head><body><h2 style="font-family:Arial,sans-serif">${escapeHtml(title)}</h2>${table}</body></html>`;
-    const file = new File(Paths.cache, `${safeFilename(filenameBase)}.xls`);
-    file.write(html);
-    await Sharing.shareAsync(file.uri, {
-      mimeType: 'application/vnd.ms-excel',
-      dialogTitle: 'Export (Excel)',
-    });
-  };
-
-  const sharePdf = async ({ title, headers, rows, filenameBase }) => {
-    const table = buildHtmlTable(rows, headers);
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8" />
-      <style>
-        body{font-family:Arial,sans-serif;padding:24px;color:#111827}
-        h2{margin:0 0 12px 0}
-        p{margin:0 0 18px 0;color:#6b7280}
-      </style>
-    </head><body><h2>${escapeHtml(title)}</h2><p>Generated: ${escapeHtml(new Date().toLocaleString('en-GB'))}</p>${table}</body></html>`;
-    const { uri } = await Print.printToFileAsync({ html });
-    await Sharing.shareAsync(uri, {
-      mimeType: 'application/pdf',
-      dialogTitle: 'Export (PDF)',
-      UTI: 'com.adobe.pdf',
-    });
-  };
 
   const handleExport = async (format) => {
     // Routine attendance reports use visit data only, never a pre-registration's
@@ -333,7 +316,7 @@ const ManagerScreen = ({ navigation, route }) => {
     setExporting(true);
     try {
       const siteName = selectedSite?.name || 'Site';
-      const dateStr  = new Date().toLocaleDateString('en-GB');
+      const SERVER_BASE = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com';
       if ((dateFrom || dateTo) && activeTab !== 'Deliveries') {
         const status = activeTab === 'Signed Out' ? 'Out' : 'In';
         const records = await getVisits({ siteId: selectedSite?.id, status, search, dateFrom: toApiDate(dateFrom), dateTo: toApiDate(dateTo) });
@@ -349,33 +332,152 @@ const ManagerScreen = ({ navigation, route }) => {
         Alert.alert('Nothing to export', 'No records match the selected filters.');
         return;
       }
-      const reportTitle = `Security Report — ${siteName} — ${dateStr}`;
-      const filenameBase = `${siteName}-Report-${dateStr}`;
 
       const isDeliveryReport = activeTab === 'Deliveries';
-      const headers = isDeliveryReport
-        ? ['Item', 'Recipient', 'Sender', 'Carrier', 'Company', 'Recorded', 'Collected']
-        : ['Name', 'Role', 'Sign In', 'Sign Out', 'Car Registration', 'Company Name', 'Checked in by'];
+      const reportTitle = isDeliveryReport
+        ? `Delivery Report`
+        : `Security Report — ${activeTab}`;
 
-      const rows = list.map(item => isDeliveryReport ? ({
-        Item: item.itemName || item.recipient || '',
-        Recipient: item.recipient || '',
-        Sender: item.sender || '',
-        Carrier: item.carrier || '',
-        Company: item.company || '',
-        Recorded: fmtExportTime(item.receivedAt || item.createdAt),
-        Collected: item.collected ? fmtExportTime(item.collectedAt) : 'No',
-      }) : ({
-        Name: item.name || '', Role: item.group || '',
-        'Sign In': fmtExportTime(item.sign_in_time), 'Sign Out': fmtExportTime(item.sign_out_time),
-        'Car Registration': item.car_reg || '', 'Company Name': item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '',
-        'Checked in by': item.checked_in_by || '',
-      }));
+      const filename = isDeliveryReport
+        ? `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`
+        : `Security_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
 
-      if (format === 'excel') {
-        await shareExcel({ title: reportTitle, headers, rows, filenameBase });
+      const columns = isDeliveryReport
+        ? [
+            { label: 'Name', getVal: (item) => item.recipient || item.name || '—' },
+            { label: 'Site / Project', getVal: () => siteName },
+            { label: 'Date', getVal: (item) => fmtExportDateOnly(item.receivedAt || item.createdAt) },
+            { label: 'Time', getVal: (item) => fmtExportTimeOnly(item.receivedAt || item.createdAt) },
+            { label: 'Duration', getVal: (item) => fmtExportDuration(item.receivedAt || item.createdAt, item.collectedAt) },
+            { label: 'Supplier', getVal: (item) => item.supplier || item.company || item.sender || '—' },
+            { label: 'Vehicle Reg', getVal: (item) => item.carRegistration || item.car_reg || '—' },
+            { label: 'Delivery Doc No.', getVal: (item) => item.deliveryDocumentNumber || item.delivery_document_number || '—' },
+            { label: 'Product', getVal: (item) => item.product || item.itemName || item.item_name || '—' },
+            { label: 'Net Weight', getVal: (item) => item.netWeight || item.net_weight || '—' },
+          ]
+        : [
+            { label: 'Date', getVal: (item) => fmtExportDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
+            { label: 'Name', getVal: (item) => item.name || '—' },
+            { label: 'Role', getVal: (item) => item.group || item.visitor_group_name || '—' },
+            { label: 'Sign In', getVal: (item) => fmtExportTimeOnly(item.sign_in_time) },
+            { label: 'Sign Out', getVal: (item) => fmtExportTimeOnly(item.sign_out_time) },
+            { label: 'Duration', getVal: (item) => fmtExportDuration(item.sign_in_time, item.sign_out_time) },
+            { label: 'Company Name', getVal: (item) => item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '—' },
+            { label: 'Car Registration', getVal: (item) => item.car_reg || '—' },
+            { label: 'Checked In By', getVal: (item) => item.checked_in_by || '—' },
+          ];
+
+      const theadHtml = columns
+        .map((col) => `<th>${escapeHtml(col.label)}</th>`)
+        .join('');
+
+      const tbodyHtml = list
+        .map((item, idx) => {
+          const cells = columns
+            .map((col) => `<td style="padding:8px 10px">${escapeHtml(col.getVal(item))}</td>`)
+            .join('');
+          return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">${cells}</tr>`;
+        })
+        .join('');
+
+      const periodLabel =
+        dateFrom || dateTo
+          ? `${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}`
+          : 'All dates';
+
+      const generatedOn = new Date().toLocaleString('en-GB', {
+        dateStyle: 'long', timeStyle: 'short',
+      });
+      const totalRows = list.length;
+
+      const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${escapeHtml(filename)}</title>
+  <style>
+    @page { margin: 20mm 15mm; size: A4 landscape; }
+    * { box-sizing: border-box; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
+    .report-shell { padding-bottom: 64px; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+    .report-head { display:flex; align-items:center; gap:16px; border-bottom:3px solid #1e3a8a; padding-bottom:14px; margin-bottom:16px; }
+    .report-head img { height:52px; max-width:170px; object-fit:contain; }
+    .report-head-copy { flex:1; }
+    .company-name { margin:0 0 4px; font-size:12px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#1e3a8a; }
+    .report-title { margin:0; font-size:22px; color:#111827; }
+    .report-meta { margin:4px 0 0; font-size:11px; color:#64748b; }
+    .report-count { text-align:right; font-size:11px; color:#64748b; }
+    .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
+    .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
+    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    .page-number::after { content: "Page " counter(page); }
+  </style>
+</head>
+<body>
+  <div class="report-shell">
+    <!-- ── Header ── -->
+    <div class="report-head">
+      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <div class="report-head-copy">
+        <p class="company-name">Tripod Services</p>
+        <h2 class="report-title">${escapeHtml(reportTitle)}</h2>
+        <p class="report-meta">
+          ${escapeHtml(siteName)} &nbsp;·&nbsp; Period: ${escapeHtml(periodLabel)} &nbsp;·&nbsp; Generated ${escapeHtml(generatedOn)}
+        </p>
+      </div>
+      <div class="report-count">
+        <strong>${totalRows}</strong>
+        <div>record${totalRows !== 1 ? 's' : ''}</div>
+      </div>
+    </div>
+
+    <!-- ── Table ── -->
+    <table>
+      <thead>
+        <tr>${theadHtml}</tr>
+      </thead>
+      <tbody>${tbodyHtml}</tbody>
+    </table>
+
+    <div class="report-end">End of report</div>
+  </div>
+
+  <!-- ── Footer ── -->
+  <div class="footer">
+    <span>Tripod Services &nbsp;·&nbsp; Official ${isDeliveryReport ? 'Delivery' : 'Security'} Report</span>
+    <span>${escapeHtml(siteName)}</span>
+    <span class="page-number"></span>
+  </div>
+
+</body>
+</html>`;
+
+      if (format === 'pdf') {
+        const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
+        const destUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
+
+        await FileSystem.deleteAsync(destUri, { idempotent: true });
+        await FileSystem.copyAsync({ from: tempUri, to: destUri });
+
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/pdf',
+          dialogTitle: `${isDeliveryReport ? 'Delivery' : 'Security'} Report (PDF)`,
+          UTI:         'com.adobe.pdf',
+        });
       } else {
-        await sharePdf({ title: reportTitle, headers, rows, filenameBase });
+        const xlsFilename = filename.replace(/\.pdf$/, '.xls');
+        const destUri  = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + xlsFilename;
+
+        await FileSystem.writeAsStringAsync(destUri, html, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
+        await Sharing.shareAsync(destUri, {
+          mimeType:    'application/vnd.ms-excel',
+          dialogTitle: `${isDeliveryReport ? 'Delivery' : 'Security'} Report (Excel)`,
+        });
       }
     } catch (err) {
       Alert.alert('Export failed', err?.message || 'Could not export.');
