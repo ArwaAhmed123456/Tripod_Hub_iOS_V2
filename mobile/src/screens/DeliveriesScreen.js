@@ -301,7 +301,7 @@ export default function DeliveriesScreen({ navigation, route }) {
       margin: 15mm 15mm 22mm 15mm;
       size: A4 landscape;
       @bottom-left   { content: "Tripod Services · Official Delivery Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
-      @bottom-center { content: "${escapeHtml(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-center { content: "${esc(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
       @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
     }
     * { box-sizing: border-box; }

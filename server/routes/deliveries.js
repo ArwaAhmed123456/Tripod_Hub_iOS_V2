@@ -109,11 +109,13 @@ router.post('/', verifyToken, (req, res) => {
 
     const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at,
       name, supplier, delivery_document_number, product, net_weight } = req.body;
-    const deliveryName = pickFirstValue(name, recipient);
+
+    // Support both new app schema (name, supplier, product) and old app schema
+    // (item_name, company, description) — old App Store users send item_name/company
+    // with no "name" field; we must not reject their submissions.
+    const deliveryName    = pickFirstValue(name, recipient, company, sender, item_name, description, 'Unknown');
     const deliverySupplier = pickFirstValue(supplier, company, sender);
-    const deliveryProduct = pickFirstValue(product, item_name);
-    if (!deliveryName) return res.status(400).json({ error: 'name is required' });
-    if (!deliveryProduct) return res.status(400).json({ error: 'product is required' });
+    const deliveryProduct  = pickFirstValue(product, item_name, description, name, 'Item');
 
     try {
       let siteId = site_id;
