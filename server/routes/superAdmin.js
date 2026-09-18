@@ -628,13 +628,30 @@ router.put('/reports/:type/:id', verifySuperAdmin, async (req, res) => {
       const updates = req.body;
 
       if (updates.recipient !== undefined) delivery.recipient = updates.recipient.trim();
-      if (updates.itemName !== undefined) delivery.itemName = updates.itemName.trim();
+      if (updates.itemName !== undefined) {
+        delivery.itemName = updates.itemName.trim();
+        if (updates.product === undefined) delivery.product = updates.itemName.trim();
+      }
+      if (updates.product !== undefined) {
+        delivery.product = updates.product.trim();
+        delivery.itemName = updates.product.trim();
+      }
       if (updates.sender !== undefined) delivery.sender = updates.sender.trim();
       if (updates.carrier !== undefined) delivery.carrier = updates.carrier.trim();
-      if (updates.company !== undefined) delivery.company = updates.company.trim();
+      if (updates.company !== undefined) {
+        delivery.company = updates.company.trim();
+        if (updates.supplier === undefined) delivery.supplier = updates.company.trim();
+      }
+      if (updates.supplier !== undefined) {
+        delivery.supplier = updates.supplier.trim();
+        delivery.company = updates.supplier.trim();
+        if (!delivery.sender) delivery.sender = updates.supplier.trim();
+      }
       if (updates.carRegistration !== undefined) delivery.carRegistration = updates.carRegistration.trim();
       if (updates.notes !== undefined) delivery.notes = updates.notes.trim();
       if (updates.description !== undefined) delivery.description = updates.description.trim();
+      if (updates.deliveryDocumentNumber !== undefined) delivery.deliveryDocumentNumber = updates.deliveryDocumentNumber.trim();
+      if (updates.netWeight !== undefined) delivery.netWeight = updates.netWeight.trim();
       if (updates.collected !== undefined) delivery.collected = Boolean(updates.collected);
       if (updates.collectedAt !== undefined) delivery.collectedAt = updates.collectedAt ? new Date(updates.collectedAt) : null;
 

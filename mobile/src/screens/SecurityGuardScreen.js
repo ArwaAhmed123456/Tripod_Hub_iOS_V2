@@ -21,6 +21,7 @@ import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import { TRIPOD_LOGO_BASE64 } from '../assets/logoBase64';
 import {
   getAccessibleSites,
   getPreRegistrations,
@@ -396,40 +397,49 @@ const SecurityGuardScreen = ({ navigation }) => {
       }
 
       // ── Build Dynamic Columns ─────────────────────────────────────────────
-      // Core columns always included:
+      // Core columns always included with proportional weights and nowrap rules:
       const columns = [
-        { label: 'Date', key: 'date', getVal: (item) => fmtDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
-        { label: 'Name', key: 'name', getVal: (item) => item.name || '—' },
-        { label: 'Role', key: 'role', getVal: (item) => item.group || item.visitor_group_name || '—' },
-        { label: 'Sign In', key: 'signIn', getVal: (item) => fmtTimeOnly(item.sign_in_time) },
-        { label: 'Sign Out', key: 'signOut', getVal: (item) => fmtTimeOnly(item.sign_out_time) },
-        { label: 'Duration', key: 'duration', getVal: (item) => fmtDuration(item.sign_in_time, item.sign_out_time) },
-        { label: 'Company Name', key: 'company', getVal: (item) => item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '—' },
+        { label: 'Date', key: 'date', weight: 10, nowrap: true, getVal: (item) => fmtDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
+        { label: 'Name', key: 'name', weight: 18, nowrap: false, getVal: (item) => item.name || '—' },
+        { label: 'Role', key: 'role', weight: 10, nowrap: false, getVal: (item) => item.group || item.visitor_group_name || '—' },
+        { label: 'Sign In', key: 'signIn', weight: 8, nowrap: true, getVal: (item) => fmtTimeOnly(item.sign_in_time) },
+        { label: 'Sign Out', key: 'signOut', weight: 8, nowrap: true, getVal: (item) => fmtTimeOnly(item.sign_out_time) },
+        { label: 'Duration', key: 'duration', weight: 8, nowrap: true, getVal: (item) => fmtDuration(item.sign_in_time, item.sign_out_time) },
+        { label: 'Company Name', key: 'company', weight: 14, nowrap: false, getVal: (item) => item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '—' },
       ];
 
       // Optional columns based on user checklist selection:
       if (optionalFields?.carReg) {
-        columns.push({ label: 'Car Registration', key: 'carReg', getVal: (item) => item.car_reg || '—' });
+        columns.push({ label: 'Car Registration', key: 'carReg', weight: 11, nowrap: true, getVal: (item) => item.car_reg || '—' });
       }
       if (optionalFields?.expectedArrival) {
         columns.push({
           label: 'Expected Arrival',
           key: 'expectedArrival',
+          weight: 12,
+          nowrap: true,
           getVal: (item) => item.expected_date ? `${fmtDateOnly(item.expected_date)} ${fmtTimeOnly(item.expected_date)}` : '—',
         });
       }
       if (optionalFields?.description) {
-        columns.push({ label: 'Description', key: 'description', getVal: (item) => item.notes || item.description || item.reason || '—' });
+        columns.push({ label: 'Description', key: 'description', weight: 13, nowrap: false, getVal: (item) => item.notes || item.description || item.reason || '—' });
+      }
+
+      const totalWeight = columns.reduce((acc, c) => acc + c.weight, 0);
+      const colWidths = columns.map((c) => Math.round((c.weight / totalWeight) * 100));
+      const sumRounded = colWidths.reduce((a, b) => a + b, 0);
+      if (colWidths.length > 0) {
+        colWidths[colWidths.length - 1] += (100 - sumRounded);
       }
 
       const theadHtml = columns
-        .map((col) => `<th>${escapeHtml(col.label)}</th>`)
+        .map((col, i) => `<th style="width:${colWidths[i]}%">${escapeHtml(col.label)}</th>`)
         .join('');
 
       const tbodyHtml = exportList
         .map((item, idx) => {
           const cells = columns
-            .map((col) => `<td style="padding:8px 10px">${escapeHtml(col.getVal(item))}</td>`)
+            .map((col, i) => `<td style="width:${colWidths[i]}%;${col.nowrap ? 'white-space:nowrap;' : ''}">${escapeHtml(col.getVal(item))}</td>`)
             .join('');
           return `<tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">${cells}</tr>`;
         })
@@ -452,23 +462,23 @@ const SecurityGuardScreen = ({ navigation }) => {
   <meta charset="utf-8" />
   <title>${escapeHtml(filename)}</title>
   <style>
-    @page { margin: 20mm 15mm; size: A4 landscape; }
+    @page { margin: 0; size: A4 landscape; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
-    .report-shell { padding-bottom: 64px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    .report-head { display:flex; align-items:center; gap:16px; border-bottom:3px solid #1e3a8a; padding-bottom:14px; margin-bottom:16px; }
-    .report-head img { height:52px; max-width:170px; object-fit:contain; }
-    .report-head-copy { flex:1; }
-    .company-name { margin:0 0 4px; font-size:12px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#1e3a8a; }
-    .report-title { margin:0; font-size:22px; color:#111827; }
-    .report-meta { margin:4px 0 0; font-size:11px; color:#64748b; }
-    .report-count { text-align:right; font-size:11px; color:#64748b; }
-    .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
-    .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
-    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111827; background: #ffffff; }
+    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e3a8a; color: #ffffff; padding: 9px 8px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; }
+    td { border-bottom: 1px solid #e2e8f0; padding: 9px 8px; vertical-align: middle; line-height: 1.35; overflow: hidden; word-break: break-word; color: #1e293b; }
+    .report-head { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #1e3a8a; padding-bottom: 14px; margin-bottom: 18px; }
+    .report-head img { height: 52px; max-width: 180px; object-fit: contain; }
+    .report-head-copy { flex: 1; }
+    .company-name { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #1e3a8a; }
+    .report-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
+    .report-meta { margin: 5px 0 0; font-size: 11px; color: #64748b; }
+    .report-count { text-align: right; font-size: 11px; color: #64748b; }
+    .report-count strong { display: block; font-size: 24px; font-weight: 700; color: #1e3a8a; }
+    .report-end { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
+    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
     .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
@@ -476,7 +486,7 @@ const SecurityGuardScreen = ({ navigation }) => {
   <div class="report-shell">
     <!-- ── Header ── -->
     <div class="report-head">
-      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <img src="${TRIPOD_LOGO_BASE64}" alt="Tripod Services logo" />
       <div class="report-head-copy">
         <p class="company-name">Tripod Services</p>
         <h2 class="report-title">${escapeHtml(reportTitle)}</h2>

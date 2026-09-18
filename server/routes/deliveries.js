@@ -55,6 +55,15 @@ function matchScore(text, q) {
   return total/qs.length;
 }
 
+function pickFirstValue(...values) {
+  for (const value of values) {
+    if (value === undefined || value === null) continue;
+    const str = String(value).trim();
+    if (str) return str;
+  }
+  return '';
+}
+
 // ── GET /api/deliveries?site_id=xxx ─────────────────────────────────────────
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -71,24 +80,40 @@ router.get('/', verifyToken, async (req, res) => {
       if (clean.length > 0) {
         const regexStr = clean.split('').map(char => `${char}[\\s\\-_.]*`).join('');
         const match = new RegExp(regexStr, 'i');
-        filter.$or = [{ itemName: match }, { recipient: match }, { company: match }, { sender: match }, { carrier: match }];
+        filter.$or = [
+          { recipient: match },
+          { product: match },
+          { itemName: match },
+          { supplier: match },
+          { company: match },
+          { sender: match },
+          { deliveryDocumentNumber: match },
+          { carRegistration: match },
+        ];
       }
     }
-    const deliveries = await Delivery.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+    const deliveries = await Delivery.find(filter)
+      .select('-deliveryImageBase64')   // exclude large base64 blob from list — fetched individually when needed
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
     res.json(deliveries);
   } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── POST /api/deliveries ─────────────────────────────────────────────────────
-// Accepts multipart/form-data (with optional delivery_image) OR JSON (no image)
+// Accepts multipart/form-data (with optional delivery_image) OR JSON (with optional delivery_image_base64)
 router.post('/', verifyToken, (req, res) => {
   uploadDeliveryImage(req, res, async (uploadErr) => {
     if (uploadErr) return res.status(400).json({ error: uploadErr.message });
 
     const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at,
       name, supplier, delivery_document_number, product, net_weight } = req.body;
-    const deliveryName = name || recipient || item_name;
+    const deliveryName = pickFirstValue(name, recipient);
+    const deliverySupplier = pickFirstValue(supplier, company, sender);
+    const deliveryProduct = pickFirstValue(product, item_name);
     if (!deliveryName) return res.status(400).json({ error: 'name is required' });
+    if (!deliveryProduct) return res.status(400).json({ error: 'product is required' });
 
     try {
       let siteId = site_id;
@@ -101,27 +126,73 @@ router.post('/', verifyToken, (req, res) => {
       const receivedAt = received_at ? new Date(received_at) : new Date();
       if (Number.isNaN(receivedAt.getTime())) return res.status(400).json({ error: 'Invalid delivery date or time' });
 
-      // Build image URL if a file was uploaded
-      const deliveryImageUrl = req.file ? `/uploads/deliveries/${req.file.filename}` : null;
+      let deliveryImageUrl = null;
+      let deliveryImageBase64 = null;
+
+      // Case 1: multer uploaded a file via multipart form
+      if (req.file) {
+        deliveryImageUrl = `/uploads/deliveries/${req.file.filename}`;
+        try {
+          const filePath = path.join(__dirname, '..', 'uploads', 'deliveries', req.file.filename);
+          if (fs.existsSync(filePath)) {
+            const buf = fs.readFileSync(filePath);
+            const mime = req.file.mimetype || 'image/jpeg';
+            deliveryImageBase64 = `data:${mime};base64,${buf.toString('base64')}`;
+          }
+        } catch (e) {
+          console.warn('Error reading uploaded file to base64:', e.message);
+        }
+      }
+
+      // Case 2: base64 image passed in JSON payload
+      const base64Data = req.body.delivery_image_base64 || req.body.deliveryImageBase64;
+      if (base64Data && typeof base64Data === 'string' && base64Data.startsWith('data:image')) {
+        deliveryImageBase64 = base64Data;
+        try {
+          const match = base64Data.match(/^data:image\/([a-zA-Z0-9+]+);base64,(.+)$/);
+          if (match) {
+            const ext = match[1] === 'jpeg' ? 'jpg' : match[1];
+            const rawBuffer = Buffer.from(match[2], 'base64');
+            const dir = path.join(__dirname, '..', 'uploads', 'deliveries');
+            if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+            const fname = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
+            fs.writeFileSync(path.join(dir, fname), rawBuffer);
+            deliveryImageUrl = `/uploads/deliveries/${fname}`;
+          }
+        } catch (e) {
+          console.warn('Error saving base64 image to disk:', e.message);
+        }
+      }
 
       const delivery = await Delivery.create({
         siteId,
         // Keep both representations in sync while clients transition to the
         // agreed Cargo form terminology.
         recipient: deliveryName,
-        sender: sender || supplier || '', carrier: carrier || '', notes: notes || description || '',
-        itemName: item_name || product || '', description: description || '',
-        carRegistration: car_registration || '', company: company || '', receivedAt,
+        sender: pickFirstValue(sender, deliverySupplier), carrier: carrier || '', notes: notes || description || '',
+        itemName: deliveryProduct, description: description || '',
+        carRegistration: car_registration || '', company: pickFirstValue(company, deliverySupplier), receivedAt,
         deliveryImageUrl,
-        supplier: supplier || sender || '',
+        deliveryImageBase64,
+        supplier: deliverySupplier,
         deliveryDocumentNumber: delivery_document_number || '',
-        product: product || item_name || '',
+        product: deliveryProduct,
         netWeight: net_weight || '',
       });
 
       res.status(201).json({ success: true, delivery });
     } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
   });
+});
+
+// ── GET /api/deliveries/:id ──────────────────────────────────────────────────
+// Returns a single delivery including deliveryImageBase64 (excluded from list endpoint)
+router.get('/:id', verifyToken, async (req, res) => {
+  try {
+    const delivery = await Delivery.findById(req.params.id).lean();
+    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+    res.json(delivery);
+  } catch (err) { console.error(err); res.status(500).json({ error: 'Server error' }); }
 });
 
 // ── POST /api/deliveries/:id/collect ────────────────────────────────────────
@@ -142,7 +213,7 @@ router.delete('/:id', verifyToken, async (req, res) => {
   try {
     const delivery = await Delivery.findById(req.params.id).lean();
     // Remove associated image file if it exists
-    if (delivery?.deliveryImageUrl) {
+    if (delivery?.deliveryImageUrl && !delivery.deliveryImageUrl.startsWith('data:')) {
       const filePath = path.join(__dirname, '..', delivery.deliveryImageUrl.replace(/^\//, ''));
       if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }

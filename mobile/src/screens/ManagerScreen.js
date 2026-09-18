@@ -20,6 +20,7 @@ import api from '../services/api';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Print from 'expo-print';
+import { TRIPOD_LOGO_BASE64 } from '../assets/logoBase64';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import {
   getAccessibleSites,
@@ -396,10 +397,10 @@ const ManagerScreen = ({ navigation, route }) => {
   <meta charset="utf-8" />
   <title>${escapeHtml(filename)}</title>
   <style>
-    @page { margin: 20mm 15mm; size: A4 landscape; }
+    @page { margin: 0; size: A4 landscape; }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
-    .report-shell { padding-bottom: 64px; }
+    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
@@ -412,7 +413,7 @@ const ManagerScreen = ({ navigation, route }) => {
     .report-count { text-align:right; font-size:11px; color:#64748b; }
     .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
     .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
-    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
     .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
@@ -420,7 +421,7 @@ const ManagerScreen = ({ navigation, route }) => {
   <div class="report-shell">
     <!-- ── Header ── -->
     <div class="report-head">
-      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <img src="${TRIPOD_LOGO_BASE64}" alt="Tripod Services logo" />
       <div class="report-head-copy">
         <p class="company-name">Tripod Services</p>
         <h2 class="report-title">${escapeHtml(reportTitle)}</h2>

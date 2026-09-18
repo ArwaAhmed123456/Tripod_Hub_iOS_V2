@@ -16,10 +16,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, CalendarDays, Download, FileText, Package, Plus, RefreshCw, Search, X } from 'lucide-react-native';
+import { ArrowLeft, CalendarDays, Download, FileText, Package, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
+import { TRIPOD_LOGO_BASE64 } from '../assets/logoBase64';
 import * as Sharing from 'expo-sharing';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -98,6 +99,25 @@ const getVehicleRegistration = (delivery) => delivery?.carRegistration || delive
 const getDeliveryDocumentNumber = (delivery) => delivery?.deliveryDocumentNumber || delivery?.delivery_document_number || '—';
 const getNetWeight = (delivery) => delivery?.netWeight || delivery?.net_weight || '—';
 
+// Returns a URI (base64 data-URI or https URL) suitable for <Image source={{ uri }} /> and <img src> in HTML reports.
+// Prefers the stored base64 so it works offline and in PDF; falls back to the server URL path.
+const getDeliveryImageSrc = (delivery) => {
+  if (!delivery) return null;
+  if (delivery.deliveryImageBase64 && typeof delivery.deliveryImageBase64 === 'string' && delivery.deliveryImageBase64.startsWith('data:')) {
+    return delivery.deliveryImageBase64;
+  }
+  if (delivery.deliveryImageUrl) {
+    const url = delivery.deliveryImageUrl;
+    if (url.startsWith('http')) return url;
+    // Relative path — prepend server root
+    const serverRoot = (typeof api !== 'undefined' && api.defaults?.baseURL)
+      ? api.defaults.baseURL.replace(/\/api\/?$/, '')
+      : 'https://tripod-signin-app.onrender.com';
+    return `${serverRoot}${url.startsWith('/') ? '' : '/'}${url}`;
+  }
+  return null;
+};
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function DeliveriesScreen({ navigation, route }) {
   const { user } = useAuth();
@@ -156,6 +176,30 @@ export default function DeliveriesScreen({ navigation, route }) {
 
   const list = useMemo(() => deliveries, [deliveries]);
 
+  // ── Delete ───────────────────────────────────────────────────────────────
+  const handleDeleteDelivery = (id) => {
+    Alert.alert(
+      'Delete delivery',
+      'This will permanently remove this delivery record. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/deliveries/${id}`);
+              setSelected(null);
+              load();
+            } catch (err) {
+              Alert.alert('Error', err?.response?.data?.error || 'Could not delete delivery.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   // ── Export ────────────────────────────────────────────────────────────────
   const exportReport = async (
     format,
@@ -168,42 +212,56 @@ export default function DeliveriesScreen({ navigation, route }) {
     }
     setExporting(true);
     try {
-      // ── Report columns ──────────────────────────────────────────────────
-      // Use only the current Delivery Report field set and avoid legacy
-      // collection/status fields from the previous template.
+      // ── Report columns with proportional widths & formatting ───────────
+      const delColumns = [
+        { label: 'Name', width: '13%', nowrap: false },
+        { label: 'Site / Project', width: '11%', nowrap: false },
+        { label: 'Date', width: '8%', nowrap: true },
+        { label: 'Time', width: '6%', nowrap: true },
+        { label: 'Duration', width: '7%', nowrap: true },
+        { label: 'Supplier', width: '12%', nowrap: false },
+        { label: 'Vehicle Reg', width: '10%', nowrap: true },
+        { label: 'Delivery Doc No.', width: '11%', nowrap: false },
+        { label: 'Product', width: '13%', nowrap: false },
+        { label: 'Net Weight', width: '9%', nowrap: true },
+      ];
+
+      const theadHtml = delColumns
+        .map((col) => `<th style="width:${col.width}">${esc(col.label)}</th>`)
+        .join('');
+
       const rows = reportItems
-        .map(
-          (d, idx) => {
-            const arrival = d.receivedAt || d.createdAt;
-            return `
-          <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'}">
-            <td style="padding:8px 10px">${esc(getDeliveryName(d))}</td>
-            <td style="padding:8px 10px">${esc(siteName)}</td>
-            <td style="padding:8px 10px;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
-            <td style="padding:8px 10px;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
-            <td style="padding:8px 10px">${esc(fmtDuration(arrival, d.collectedAt) )}</td>
-            <td style="padding:8px 10px">${esc(getDeliverySupplier(d))}</td>
-            <td style="padding:8px 10px">${esc(getVehicleRegistration(d))}</td>
-            <td style="padding:8px 10px">${esc(getDeliveryDocumentNumber(d))}</td>
-            <td style="padding:8px 10px">${esc(getDeliveryProduct(d))}</td>
-            <td style="padding:8px 10px">${esc(getNetWeight(d))}</td>
+        .map((d, idx) => {
+          const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+          const arrival = d.receivedAt || d.createdAt;
+          return `<tr style="background:${bg}">
+            <td style="width:13%"><strong style="color:#0f172a">${esc(getDeliveryName(d))}</strong></td>
+            <td style="width:11%">${esc(siteName)}</td>
+            <td style="width:8%;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
+            <td style="width:6%;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
+            <td style="width:7%;white-space:nowrap">${esc(fmtDuration(arrival, d.collectedAt))}</td>
+            <td style="width:12%">${esc(getDeliverySupplier(d))}</td>
+            <td style="width:10%;white-space:nowrap">${esc(getVehicleRegistration(d))}</td>
+            <td style="width:11%">${esc(getDeliveryDocumentNumber(d))}</td>
+            <td style="width:13%">${esc(getDeliveryProduct(d))}</td>
+            <td style="width:9%;white-space:nowrap">${esc(getNetWeight(d))}</td>
           </tr>`;
-          },
-        )
+        })
         .join('');
 
       // ── Delivery picture section ─────────────────────────────────────────
       const singleDelivery = reportItems.length === 1 ? reportItems[0] : null;
       let imageSection = '';
-      if (includePhotos && singleDelivery?.deliveryImageUrl) {
+      const singleImg = singleDelivery ? getDeliveryImageSrc(singleDelivery) : null;
+      if (includePhotos && singleImg) {
         imageSection = `
           <div style="margin-top:28px;page-break-inside:avoid">
             <h3 style="font-size:13px;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Delivery Picture</h3>
-            <img src="${SERVER_BASE}${singleDelivery.deliveryImageUrl}"
+            <img src="${singleImg}"
               style="max-width:400px;max-height:280px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
           </div>`;
       } else if (includePhotos && reportItems.length > 1) {
-        const withPics = reportItems.filter((d) => d.deliveryImageUrl);
+        const withPics = reportItems.filter((d) => getDeliveryImageSrc(d));
         if (withPics.length > 0) {
           imageSection = `
           <div style="margin-top:32px;page-break-before:always">
@@ -214,7 +272,7 @@ export default function DeliveriesScreen({ navigation, route }) {
                   <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:6px">
                     ${esc(getDeliveryName(d))} — ${esc(getDeliverySupplier(d))}
                   </div>
-                  <img src="${SERVER_BASE}${d.deliveryImageUrl}"
+                  <img src="${getDeliveryImageSrc(d)}"
                     style="width:100%;height:170px;object-fit:cover;border-radius:6px" />
                 </div>`).join('')}
             </div>
@@ -241,23 +299,23 @@ export default function DeliveriesScreen({ navigation, route }) {
   <meta charset="utf-8" />
   <title>${esc(filename)}</title>
   <style>
-    @page { margin: 20mm 15mm; size: A4 landscape; }
+    @page { margin: 0; size: A4 landscape; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
-    .report-shell { padding-bottom: 64px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
-    td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
-    .report-head { display:flex; align-items:center; gap:16px; border-bottom:3px solid #1e3a8a; padding-bottom:14px; margin-bottom:16px; }
-    .report-head img { height:52px; max-width:170px; object-fit:contain; }
-    .report-head-copy { flex:1; }
-    .company-name { margin:0 0 4px; font-size:12px; font-weight:700; letter-spacing:1.1px; text-transform:uppercase; color:#1e3a8a; }
-    .report-title { margin:0; font-size:22px; color:#111827; }
-    .report-meta { margin:4px 0 0; font-size:11px; color:#64748b; }
-    .report-count { text-align:right; font-size:11px; color:#64748b; }
-    .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
-    .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
-    .footer { position: fixed; left: 0; right: 0; bottom: 0; border-top: 1px solid #e5e7eb; padding: 10px 15mm 0; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
+    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111827; background: #ffffff; }
+    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+    th { background: #1e3a8a; color: #ffffff; padding: 9px 8px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; }
+    td { border-bottom: 1px solid #e2e8f0; padding: 9px 8px; vertical-align: middle; line-height: 1.35; overflow: hidden; word-break: break-word; color: #1e293b; }
+    .report-head { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #1e3a8a; padding-bottom: 14px; margin-bottom: 18px; }
+    .report-head img { height: 52px; max-width: 180px; object-fit: contain; }
+    .report-head-copy { flex: 1; }
+    .company-name { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #1e3a8a; }
+    .report-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
+    .report-meta { margin: 5px 0 0; font-size: 11px; color: #64748b; }
+    .report-count { text-align: right; font-size: 11px; color: #64748b; }
+    .report-count strong { display: block; font-size: 24px; font-weight: 700; color: #1e3a8a; }
+    .report-end { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
+    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
     .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
@@ -265,7 +323,7 @@ export default function DeliveriesScreen({ navigation, route }) {
   <div class="report-shell">
     <!-- ── Header ── -->
     <div class="report-head">
-      <img src="${SERVER_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services logo" />
+      <img src="${TRIPOD_LOGO_BASE64}" alt="Tripod Services logo" />
       <div class="report-head-copy">
         <p class="company-name">Tripod Services</p>
         <h2 class="report-title">${esc(reportTitle)}</h2>
@@ -282,18 +340,7 @@ export default function DeliveriesScreen({ navigation, route }) {
     <!-- ── Table ── -->
     <table>
       <thead>
-        <tr>
-          <th>Name</th>
-          <th>Site / Project</th>
-          <th>Date</th>
-          <th>Time</th>
-          <th>Duration</th>
-          <th>Supplier</th>
-          <th>Vehicle Reg</th>
-          <th>Delivery Doc No.</th>
-          <th>Product</th>
-          <th>Net Weight</th>
-        </tr>
+        <tr>${theadHtml}</tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
@@ -390,11 +437,11 @@ export default function DeliveriesScreen({ navigation, route }) {
             ))}
 
           {/* Delivery picture */}
-          {d?.deliveryImageUrl ? (
+          {getDeliveryImageSrc(d) ? (
             <View style={s.detailImageSection}>
               <Text style={s.detailLabel}>Delivery Picture</Text>
               <Image
-                source={{ uri: `${SERVER_BASE}${d.deliveryImageUrl}` }}
+                source={{ uri: getDeliveryImageSrc(d) }}
                 style={s.detailImage}
                 resizeMode="cover"
               />
@@ -428,6 +475,14 @@ export default function DeliveriesScreen({ navigation, route }) {
           >
             <Download size={18} color="#fff" />
             <Text style={s.buttonText}>Download Details</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.detailDelete}
+            onPress={() => handleDeleteDelivery(d._id || d.id)}
+          >
+            <Trash2 size={18} color="#dc2626" />
+            <Text style={s.detailDeleteText}>Delete Delivery</Text>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -704,6 +759,8 @@ const s = StyleSheet.create({
   photoToggleLabel:{ fontSize: 13, fontWeight: '600', color: '#334155' },
   detailExport:    { backgroundColor: '#2b4594', borderRadius: 12, padding: 14, marginTop: 18, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   buttonText:      { color: '#fff', fontWeight: '800', fontSize: 15 },
+  detailDelete:    { borderWidth: 1.5, borderColor: '#fecaca', borderRadius: 12, padding: 14, marginTop: 10, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, backgroundColor: '#fff5f5' },
+  detailDeleteText:{ color: '#dc2626', fontWeight: '700', fontSize: 15 },
   // Export modal
   modalBackdrop:   { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
   modalCard:       { backgroundColor: '#fff', borderRadius: 20, width: '100%', maxWidth: 360, padding: 22, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 6, elevation: 5 },

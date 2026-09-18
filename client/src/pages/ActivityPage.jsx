@@ -21,6 +21,7 @@ import toast, { Toaster } from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import api from '../api';
 import SlideOutDrawer from '../components/SlideOutDrawer';
+import { LOGO_BASE64 } from '../assets/logoBase64';
 
 const toInputDate = (date = new Date()) => {
   const year = date.getFullYear();
@@ -155,140 +156,254 @@ const StatCard = ({ label, value }) => (
 );
 
 const ExportModal = ({ visits, groups, siteName, onClose }) => {
+  const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/api\/?$/, '') || '';
   const [selectedGroup, setSelectedGroup] = useState('All');
-  const [selectedFields, setSelectedFields] = useState([
-    'Name', 'Date', 'Time In', 'Time Out', 'Role', 'Company', 'Hrs', 'Mins',
-  ]);
+  const [exportFormat, setExportFormat] = useState('pdf');
+
+  // Core visible fields — sensible defaults, user can toggle any
+  const CORE_FIELDS = ['Name', 'Date', 'Sign In', 'Sign Out', 'Duration', 'Role', 'Company Name', 'Car Reg'];
+  const ALL_FIELDS  = ['Name', 'Date', 'Sign In', 'Sign Out', 'Duration', 'Role', 'Company', 'Company Name', 'Car Reg', 'Expected Arrival', 'Description', 'Site', 'Notes'];
+
+  // Auto-detect which fields have at least one non-empty value across the visit set
+  const fieldsWithData = useMemo(() => {
+    const fieldGetters = {
+      'Name':             v => v.name,
+      'Date':             v => v.sign_in_time || v.created_at,
+      'Sign In':          v => v.sign_in_time,
+      'Sign Out':         v => v.sign_out_time,
+      'Duration':         v => v.hours,
+      'Role':             v => v.group,
+      'Company':          v => v.trade,
+      'Company Name':     v => v.employee_company_name,
+      'Car Reg':          v => v.car_reg,
+      'Expected Arrival': v => v.expected_date,
+      'Description':      v => v.description || v.reason,
+      'Site':             v => v.site,
+      'Notes':            v => v.reason,
+    };
+    return ALL_FIELDS.filter(f => visits.some(v => Boolean(fieldGetters[f]?.(v))));
+  }, [visits]);
+
+  const [selectedFields, setSelectedFields] = useState(() =>
+    CORE_FIELDS.filter(f => fieldsWithData.includes(f))
+  );
 
   const groupedVisits = useMemo(() => {
     if (selectedGroup === 'All') return visits;
-    return visits.filter((visit) => visit.group === selectedGroup);
+    return visits.filter(v => v.group === selectedGroup);
   }, [selectedGroup, visits]);
 
-  const toggleField = (field) => {
-    setSelectedFields((current) =>
-      current.includes(field)
-        ? current.filter((item) => item !== field)
-        : [...current, field]
-    );
+  const toggleField = (f) => setSelectedFields(cur =>
+    cur.includes(f) ? cur.filter(x => x !== f) : [...cur, f]
+  );
+
+  // ── Shared helpers ──────────────────────────────────────────────────────
+  const fmtDatePart = (iso) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+  const fmtTimePart = (iso) => iso ? new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+  const fmtDur = (v) => {
+    if (!v.sign_in_time || !v.sign_out_time) return '';
+    const ms = new Date(v.sign_out_time) - new Date(v.sign_in_time);
+    if (ms <= 0) return '';
+    const h = Math.floor(ms / 3600000);
+    const m = Math.round((ms % 3600000) / 60000);
+    return h > 0 ? `${h}h ${m}m` : `${m} min`;
   };
 
-  const handleExport = () => {
-    if (!groupedVisits.length) {
-      toast.error('There is no visit data to export');
-      return;
-    }
+  // Normalise plural group names stored in the DB to their singular display form
+  const normaliseRole = (raw) => {
+    if (!raw) return '';
+    const map = { Employees: 'Employee', Visitors: 'Visitor', Workers: 'Worker', Contractors: 'Contractor', Deliveries: 'Delivery' };
+    return map[raw] || raw;
+  };
 
-    if (!selectedFields.length) {
-      toast.error('Select at least one field to export');
-      return;
-    }
+  const getCellValue = (field, v) => ({
+    'Name':             v.name || '',
+    'Date':             fmtDatePart(v.sign_in_time || v.created_at),
+    'Sign In':          fmtTimePart(v.sign_in_time),
+    'Sign Out':         fmtTimePart(v.sign_out_time),
+    'Duration':         fmtDur(v),
+    'Role':             normaliseRole(v.group),
+    'Company':          v.trade || '',
+    'Company Name':     v.employee_company_name || '',
+    'Car Reg':          v.car_reg || '',
+    'Expected Arrival': fmtDatePart(v.expected_date) || '',
+    'Description':      v.description || v.reason || '',
+    'Site':             v.site || '',
+    'Notes':            v.reason || '',
+  })[field] ?? '';
 
-    const rows = groupedVisits.map((visit) => {
-      const row = {};
-      selectedFields.forEach((fieldName) => {
-        const field = VISIT_EXPORT_FIELDS.find((item) => item.id === fieldName);
-        row[fieldName] = field ? field.value(visit) : '';
-      });
-      return row;
-    });
+  // ── PDF ─────────────────────────────────────────────────────────────────
+  const handlePDF = () => {
+    if (!groupedVisits.length) { toast.error('No data to export'); return; }
+    if (!selectedFields.length) { toast.error('Select at least one column'); return; }
 
-    const safeSiteName = (siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
-    downloadWorkbook(rows, `${safeSiteName}-activity-export.xlsx`, 'Activity');
-    toast.success(`Exported ${rows.length} visit${rows.length === 1 ? '' : 's'}`);
+    const safeSite = (siteName || 'Site').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+    const today    = new Date().toISOString().slice(0, 10);
+    const filename = `SecurityReport_${safeSite}_${today}`;
+
+    const theadCells = selectedFields.map(f => `<th>${f}</th>`).join('');
+    const tbodyRows  = groupedVisits.map((v, i) =>
+      `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">${selectedFields.map(f =>
+        `<td>${getCellValue(f, v) || '&mdash;'}</td>`
+      ).join('')}</tr>`
+    ).join('');
+
+    const generatedOn = new Date().toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' });
+
+    // Column widths — minimum guaranteed widths then proportional fill
+    // Weights chosen so Date (11), Duration (10), Sign In/Out (8) never clip their headers
+    const colWeights = {
+      'Name': 15, 'Role': 8, 'Date': 11, 'Sign In': 8, 'Sign Out': 8,
+      'Duration': 10, 'Car Reg': 10, 'Company Name': 13,
+      'Expected Arrival': 10, 'Description': 15, 'Site': 9, 'Notes': 12,
+    };
+    const totalWeight = selectedFields.reduce((s, f) => s + (colWeights[f] || 10), 0);
+    const colGroupHtml = selectedFields.map(f => {
+      const w = (((colWeights[f] || 10) / totalWeight) * 100).toFixed(1);
+      return `<col style="width:${w}%" />`;
+    }).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<style>
+  @page {
+    margin: 16mm 16mm 22mm 16mm;
+    size: A4 landscape;
+    @bottom-left   { content: "Tripod Services · Official Security Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    @bottom-center { content: "${siteName || ''}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; margin: 0; padding: 0; }
+  .shell { width: 100%; }
+  .hdr { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; }
+  .hdr img { height: 46px; max-width: 160px; object-fit: contain; flex-shrink: 0; }
+  .hdr-copy { flex: 1; min-width: 0; }
+  .co-name { margin: 0 0 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #1e3a8a; }
+  .hdr-copy h2 { margin: 0; font-size: 20px; color: #0f172a; }
+  .hdr-copy p { margin: 4px 0 0; font-size: 10px; color: #64748b; }
+  .badge { text-align: right; font-size: 10px; color: #64748b; white-space: nowrap; padding-left: 10px; flex-shrink: 0; }
+  .badge strong { display: block; font-size: 22px; font-weight: 700; color: #1e3a8a; line-height: 1; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+  th { background: #1e3a8a; color: #fff; padding: 8px 6px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; overflow: hidden; }
+  td { padding: 8px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; word-break: break-word; overflow-wrap: break-word; line-height: 1.45; }
+  tr.odd td { background: #f8fafc; }
+  tr.even td { background: #fff; }
+  .report-end { margin-top: 20px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
+</style>
+</head><body>
+<div class="shell">
+  <div class="hdr">
+    <img src="${LOGO_BASE64}" alt="Tripod Services logo" />
+    <div class="hdr-copy">
+      <p class="co-name">Tripod Services</p>
+      <h2>Security Report</h2>
+      <p>${siteName || ''} &nbsp;&middot;&nbsp; Generated ${generatedOn}</p>
+    </div>
+    <div class="badge"><strong>${groupedVisits.length}</strong>record${groupedVisits.length !== 1 ? 's' : ''}</div>
+  </div>
+  <table>
+    <colgroup>${colGroupHtml}</colgroup>
+    <thead><tr>${theadCells}</tr></thead>
+    <tbody>${tbodyRows}</tbody>
+  </table>
+  <div class="report-end">End of report</div>
+</div>
+<script>
+  document.title = '${filename}';
+  window.onload = function() { window.print(); };
+</script>
+</body></html>`;
+
+    // Use a Blob URL so the browser treats it as a real document (not about:blank)
+    // This ensures data: URIs in <img src> are honoured and CSP doesn't block them.
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const w = window.open(blobUrl, '_blank');
+    if (!w) { toast.error('Pop-up blocked — allow pop-ups and try again'); URL.revokeObjectURL(blobUrl); return; }
+    // Revoke after a delay so the window has time to load
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
+    onClose();
+  };
+
+  // ── Excel ───────────────────────────────────────────────────────────────
+  const handleExcel = () => {
+    if (!groupedVisits.length) { toast.error('No data to export'); return; }
+    if (!selectedFields.length) { toast.error('Select at least one column'); return; }
+    const rows = groupedVisits.map(v => Object.fromEntries(selectedFields.map(f => [f, getCellValue(f, v)])));
+    const safeSite = (siteName || 'Site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+    const today    = new Date().toISOString().slice(0, 10);
+    downloadWorkbook(rows, `SecurityReport_${safeSite}_${today}.xlsx`, 'Security Report');
+    toast.success(`Exported ${rows.length} record${rows.length !== 1 ? 's' : ''}`);
     onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4">
       <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <div>
-            <h2 className="text-2xl font-semibold text-slate-800">Export visit data</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Export the current visit timeline for {siteName || 'this site'}.
-            </p>
+            <h2 className="text-xl font-semibold text-slate-800">Export Security Report</h2>
+            <p className="mt-0.5 text-sm text-slate-500">{siteName || 'This site'} · {groupedVisits.length} record{groupedVisits.length !== 1 ? 's' : ''}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X size={18} />
-          </button>
+          <button type="button" onClick={onClose} className="rounded-full p-2 text-slate-400 hover:bg-slate-100"><X size={18}/></button>
         </div>
 
-        <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
-          <div>
-            <label className="mb-2 block text-sm font-semibold text-slate-700">Export group</label>
-            <select
-              value={selectedGroup}
-              onChange={(event) => setSelectedGroup(event.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594] focus:ring-1 focus:ring-[#2b4594]"
-            >
-              <option value="All">All groups</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.name}>
-                  {group.name}
-                </option>
-              ))}
-            </select>
+        <div className="max-h-[65vh] overflow-y-auto px-6 py-5 space-y-5">
+          {/* Format + Group row */}
+          <div className="flex flex-wrap gap-4">
+            <div className="flex-1 min-w-[160px]">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Format</label>
+              <div className="flex gap-2">
+                {['pdf','excel'].map(fmt => (
+                  <button key={fmt} type="button"
+                    onClick={() => setExportFormat(fmt)}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${exportFormat === fmt ? 'border-[#2b4594] bg-[#eff6ff] text-[#2b4594]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                    {fmt === 'pdf' ? 'PDF' : 'Excel (.xlsx)'}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex-1 min-w-[160px]">
+              <label className="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Group filter</label>
+              <select value={selectedGroup} onChange={e => setSelectedGroup(e.target.value)}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-[#2b4594]">
+                <option value="All">All groups</option>
+                {groups.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+              </select>
+            </div>
           </div>
 
+          {/* Column selector */}
           <div>
-            <div className="mb-3 flex items-center gap-4">
-              <span className="text-sm font-semibold text-slate-700">System fields</span>
-              <button
-                type="button"
-                onClick={() => setSelectedFields(VISIT_EXPORT_FIELDS.map((field) => field.id))}
-                className="text-sm font-semibold text-[#2b4594] hover:underline"
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedFields([])}
-                className="text-sm font-semibold text-[#2b4594] hover:underline"
-              >
-                Deselect all
-              </button>
+            <div className="mb-2 flex items-center gap-4">
+              <span className="text-sm font-semibold text-slate-700">Columns to include</span>
+              <button type="button" onClick={() => setSelectedFields([...fieldsWithData])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all with data</button>
+              <button type="button" onClick={() => setSelectedFields([])} className="text-xs font-semibold text-slate-400 hover:underline">Clear</button>
             </div>
-
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {VISIT_EXPORT_FIELDS.map((field) => (
-                <label key={field.id} className="flex items-center gap-3 rounded-lg border border-slate-200 px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={selectedFields.includes(field.id)}
-                    onChange={() => toggleField(field.id)}
-                    className="h-4 w-4 accent-[#2b4594]"
-                  />
-                  <span className="text-sm text-slate-700">{field.id}</span>
-                </label>
-              ))}
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+              {ALL_FIELDS.map(f => {
+                const hasData = fieldsWithData.includes(f);
+                return (
+                  <label key={f} className={`flex items-center gap-2.5 rounded-lg border px-3 py-2 cursor-pointer transition-colors ${selectedFields.includes(f) ? 'border-[#2b4594] bg-[#eff6ff]' : 'border-slate-200 hover:bg-slate-50'} ${!hasData ? 'opacity-50' : ''}`}>
+                    <input type="checkbox" checked={selectedFields.includes(f)} onChange={() => toggleField(f)} className="h-4 w-4 accent-[#2b4594]"/>
+                    <span className="text-sm text-slate-700">{f}</span>
+                    {!hasData && <span className="ml-auto text-[10px] text-slate-400">empty</span>}
+                  </label>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 px-6 py-4">
-          <p className="text-sm text-slate-500">
-            {groupedVisits.length} row{groupedVisits.length === 1 ? '' : 's'} will be exported.
-          </p>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#2b4594] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1e326e]"
-            >
-              <Download size={15} />
-              Export
+        {/* Footer */}
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-4">
+          <p className="text-sm text-slate-500">{groupedVisits.length} row{groupedVisits.length !== 1 ? 's' : ''} · {selectedFields.length} column{selectedFields.length !== 1 ? 's' : ''}</p>
+          <div className="flex gap-3">
+            <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-white">Cancel</button>
+            <button type="button" onClick={exportFormat === 'pdf' ? handlePDF : handleExcel}
+              className="inline-flex items-center gap-2 rounded-lg bg-[#2b4594] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1e326e]">
+              <Download size={15}/>{exportFormat === 'pdf' ? 'Print / Save PDF' : 'Download Excel'}
             </button>
           </div>
         </div>
@@ -1458,92 +1573,210 @@ const DeliveriesTab = ({ siteId, siteName }) => {
   const [showExportModal, setShowExportModal] = useState(false);
   const [includeExportPhotos, setIncludeExportPhotos] = useState(true);
   const [deliveryExportColumns, setDeliveryExportColumns] = useState([
-    'Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image',
+    'Name', 'Site / Project', 'Date', 'Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image',
   ]);
   const fileInputRef = React.useRef(null);
 
   const API_BASE = import.meta.env.VITE_API_URL || '';
 
-  const handlePrintReport = () => {
+  const handlePrintReport = async () => {
     if (!deliveryExportColumns.length) {
       toast.error('Select at least one column to export');
       return;
     }
     setShowExportModal(false);
-    const printWin = window.open('', '_blank');
-    if (!printWin) return;
-    const deliveryFields = {
-      Name: d => d.recipient || '—',
-      'Site / Project': () => siteName || '—',
-      'Date / Time': d => new Date(d.receivedAt || d.createdAt).toLocaleString('en-GB'),
-      Supplier: d => d.supplier || d.sender || d.company || '—',
-      'Vehicle Reg': d => d.carRegistration || '—',
-      'Delivery Document Number': d => d.deliveryDocumentNumber || '—',
-      Product: d => d.product || d.itemName || '—',
-      'Net Weight': d => d.netWeight || '—',
-    };
-    const tableColumns = deliveryExportColumns.filter(c => c !== 'Image');
-    const rowsHtml = filtered.map(d => `<tr>${tableColumns.map(c =>
-      `<td style="padding:8px;border:1px solid #e2e8f0;">${deliveryFields[c](d)}</td>`
-    ).join('')}</tr>`).join('');
 
-    let picsHtml = '';
-    if (includeExportPhotos && deliveryExportColumns.includes('Image')) {
-      const withPics = filtered.filter(d => d.deliveryImageUrl);
-      if (withPics.length > 0) {
-        picsHtml = `
-          <div style="margin-top:30px;page-break-before:always">
-            <h3 style="margin-bottom:12px;color:#1e293b">Attached Delivery Pictures</h3>
-            <div style="display:flex;flex-wrap:wrap;gap:16px;">
-              ${withPics.map(d => `
-                <div style="border:1px solid #e2e8f0;padding:8px;border-radius:6px;width:240px">
-                  <p style="margin:0 0 6px;font-size:12px;font-weight:bold">${d.recipient || d.itemName || 'Item'}</p>
-                  <img src="${API_BASE}${d.deliveryImageUrl}" style="width:100%;height:150px;object-fit:cover;border-radius:4px" />
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        `;
-      }
+    // ── helpers ──────────────────────────────────────────────────────────
+    const fmtDate  = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '&mdash;';
+    const fmtTime  = (v) => v ? new Date(v).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '&mdash;';
+    const fmtDateTime = (v) => v ? new Date(v).toLocaleString('en-GB', {
+      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    }) : '&mdash;';
+    const formatDateFile = (dateValue) => {
+      const date = dateValue || new Date();
+      const dd = String(date.getDate()).padStart(2, '0');
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const yyyy = date.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+    const getDeliveryName    = (d) => d.recipient || d.name || '&mdash;';
+    const getDeliverySupplier= (d) => d.supplier || d.company || d.sender || '&mdash;';
+    const getDeliveryProduct = (d) => d.product || d.itemName || '&mdash;';
+
+    // Convert image to inline data URI — fetches full single record (base64 excluded from list)
+    const toDataUri = async (d) => {
+      if (d.deliveryImageBase64 && d.deliveryImageBase64.startsWith('data:')) return d.deliveryImageBase64;
+      const id = d._id || d.id;
+      if (!id) return null;
+      try {
+        const resp = await api.get(`/deliveries/${id}`);
+        const full = resp.data;
+        if (full?.deliveryImageBase64?.startsWith('data:')) return full.deliveryImageBase64;
+        const imgUrl = full?.deliveryImageUrl || d.deliveryImageUrl;
+        if (imgUrl) {
+          const fullUrl = imgUrl.startsWith('http') ? imgUrl
+            : `${window.location.origin}${imgUrl.startsWith('/') ? '' : '/'}${imgUrl}`;
+          const imgResp = await fetch(fullUrl);
+          if (!imgResp.ok) return null;
+          const blob = await imgResp.blob();
+          return await new Promise((res) => {
+            const reader = new FileReader();
+            reader.onloadend = () => res(reader.result);
+            reader.readAsDataURL(blob);
+          });
+        }
+      } catch { return null; }
+      return null;
+    };
+
+    // Whether user wants Image column in the table
+    const wantImage = includeExportPhotos && deliveryExportColumns.includes('Image');
+    const tableColumns = deliveryExportColumns.filter(c => c !== 'Image' && c !== 'Duration');
+
+    // Pre-fetch all images if needed (parallel, capped at 20)
+    const imageMap = {};
+    if (wantImage) {
+      const withImg = filtered.filter(d => d.deliveryImageUrl || d.deliveryImageBase64).slice(0, 20);
+      await Promise.all(withImg.map(async (d) => {
+        const src = await toDataUri(d);
+        if (src) imageMap[d._id || d.id] = src;
+      }));
     }
 
-    printWin.document.write(`
-      <html>
-        <head>
-          <title>Delivery Report - ${siteName || 'Site'}</title>
-          <style>body { font-family: Arial, sans-serif; padding: 28px; color: #1e293b; }.report-head{display:flex;align-items:center;gap:16px;border-bottom:3px solid #2b4594;padding-bottom:14px}.report-head img{height:46px;max-width:170px;object-fit:contain}</style>
-        </head>
-        <body>
-          <div class="report-head"><img src="${API_BASE}/Tipod_Final_Logo_high_pixel.png" alt="Tripod Services"/><div><h2 style="margin:0">Delivery Report</h2><p style="margin:5px 0 0;color:#64748b;font-size:13px">${siteName || 'Site'} · Generated ${new Date().toLocaleString('en-GB')}</p></div></div>
-          <table style="width:100%;border-collapse:collapse;margin-top:16px;">
-            <thead>
-              <tr style="background:#f8fafc;font-weight:bold;text-align:left;">
-                ${tableColumns.map(c => `<th style="padding:8px;border:1px solid #e2e8f0;">${c}</th>`).join('')}
-              </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-          ${picsHtml}
-          <script>window.onload = function() { window.print(); window.close(); }<\/script>
-        </body>
-      </html>
-    `);
-    printWin.document.close();
+    // Field value resolvers
+    const deliveryFields = {
+      'Name':                     d => `<strong style="color:#0f172a">${getDeliveryName(d)}</strong>`,
+      'Site / Project':           () => siteName || '&mdash;',
+      'Date':                     d => fmtDate(d.receivedAt || d.createdAt),
+      'Time':                     d => fmtTime(d.receivedAt || d.createdAt),
+      'Date / Time':              d => fmtDateTime(d.receivedAt || d.createdAt),
+      'Supplier':                 d => getDeliverySupplier(d),
+      'Vehicle Reg':              d => d.carRegistration || '&mdash;',
+      'Delivery Document Number': d => d.deliveryDocumentNumber || '&mdash;',
+      'Product':                  d => getDeliveryProduct(d),
+      'Net Weight':               d => d.netWeight || '&mdash;',
+    };
+
+    // Column weights — no Duration, Image gets its own width when included
+    const colWeights = {
+      'Name': 14, 'Site / Project': 9, 'Date': 9, 'Time': 6,
+      'Date / Time': 13, 'Supplier': 12, 'Vehicle Reg': 9,
+      'Delivery Document Number': 11, 'Product': 12, 'Net Weight': 7,
+    };
+    const imgColW = wantImage ? 14 : 0;
+    const totalW = tableColumns.reduce((s, c) => s + (colWeights[c] || 9), 0) + imgColW;
+    const colGroupHtml = [
+      ...tableColumns.map(c => {
+        const w = (((colWeights[c] || 9) / totalW) * 100).toFixed(1);
+        return `<col style="width:${w}%" />`;
+      }),
+      ...(wantImage ? [`<col style="width:${((imgColW / totalW) * 100).toFixed(1)}%" />`] : []),
+    ].join('');
+
+    const theadCells = [
+      ...tableColumns.map(c => `<th>${c}</th>`),
+      ...(wantImage ? ['<th>Photo</th>'] : []),
+    ].join('');
+
+    const rowsHtml = filtered.map((d, i) => {
+      const id = d._id || d.id;
+      const imgSrc = wantImage ? (imageMap[id] || null) : null;
+      const imgCell = wantImage
+        ? `<td style="vertical-align:middle;text-align:center">${imgSrc
+            ? `<img src="${imgSrc}" style="max-width:100%;max-height:80px;object-fit:cover;border-radius:4px;display:block;margin:0 auto" />`
+            : '<span style="color:#94a3b8;font-size:10px">No photo</span>'
+          }</td>`
+        : '';
+      return `<tr class="${i % 2 === 0 ? 'even' : 'odd'}">${
+        tableColumns.map(c => `<td>${deliveryFields[c]?.(d) ?? '&mdash;'}</td>`).join('')
+      }${imgCell}</tr>`;
+    }).join('');
+
+    const generatedOn = new Date().toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' });
+    const safeSite    = (siteName || 'Site').replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_');
+    const docTitle    = `Delivery_Report_${safeSite}_${formatDateFile(new Date())}.pdf`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<title>${docTitle}</title>
+<style>
+  @page {
+    margin: 16mm 16mm 22mm 16mm;
+    size: A4 landscape;
+    @bottom-left   { content: "Tripod Services · Official Delivery Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    @bottom-center { content: "${siteName || ''}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 11px; color: #111827; margin: 0; padding: 0; }
+  .shell { width: 100%; }
+  .hdr { display: flex; align-items: center; gap: 14px; border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; }
+  .hdr img { height: 46px; max-width: 160px; object-fit: contain; flex-shrink: 0; }
+  .hdr-copy { flex: 1; min-width: 0; }
+  .co-name { margin: 0 0 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #1e3a8a; }
+  .hdr-copy h2 { margin: 0; font-size: 20px; color: #0f172a; }
+  .hdr-copy p { margin: 4px 0 0; font-size: 10px; color: #64748b; }
+  .badge { text-align: right; font-size: 10px; color: #64748b; white-space: nowrap; padding-left: 10px; flex-shrink: 0; }
+  .badge strong { display: block; font-size: 22px; font-weight: 700; color: #1e3a8a; line-height: 1; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; table-layout: fixed; }
+  th { background: #1e3a8a; color: #fff; padding: 8px 6px; text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .4px; white-space: nowrap; overflow: hidden; }
+  td { padding: 8px 6px; border-bottom: 1px solid #e5e7eb; vertical-align: top; word-break: break-word; overflow-wrap: break-word; line-height: 1.45; }
+  tr.odd td { background: #f8fafc; }
+  tr.even td { background: #fff; }
+  .report-end { margin-top: 20px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
+</style>
+</head><body>
+<div class="shell">
+  <div class="hdr">
+    <img src="${LOGO_BASE64}" alt="Tripod Services logo" />
+    <div class="hdr-copy">
+      <p class="co-name">Tripod Services</p>
+      <h2>Delivery Report</h2>
+      <p>${siteName || ''} &nbsp;&middot;&nbsp; Generated ${generatedOn}</p>
+    </div>
+    <div class="badge"><strong>${filtered.length}</strong>record${filtered.length !== 1 ? 's' : ''}</div>
+  </div>
+  <table>
+    <colgroup>${colGroupHtml}</colgroup>
+    <thead><tr>${theadCells}</tr></thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="report-end">End of report</div>
+</div>
+<script>
+  document.title = '${docTitle}';
+  window.onload = function() { window.print(); };
+</script>
+</body></html>`;
+
+    // Open as a Blob URL — this ensures data: URIs in <img src> are not blocked by CSP
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWin = window.open(blobUrl, '_blank');
+    if (!printWin) { toast.error('Pop-up blocked — allow pop-ups and try again'); URL.revokeObjectURL(blobUrl); return; }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
   };
 
   const handleDeliveryExcelExport = () => {
     if (!deliveryExportColumns.length) return toast.error('Select at least one column to export');
+    const fmtDateOnly = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+    const fmtTimeOnly = (v) => v ? new Date(v).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
     const values = {
-      Name: d => d.recipient || '', 'Site / Project': () => siteName || '',
-      'Date / Time': d => d.receivedAt ? new Date(d.receivedAt).toLocaleString('en-GB') : '',
-      Supplier: d => d.supplier || d.sender || d.company || '',
-      'Vehicle Reg': d => d.carRegistration || '',
-      'Delivery Document Number': d => d.deliveryDocumentNumber || '',
-      Product: d => d.product || d.itemName || '', 'Net Weight': d => d.netWeight || '',
-      Image: d => d.deliveryImageUrl ? 'Included' : '',
+      'Name':                    d => d.recipient || d.name || '',
+      'Site / Project':          () => siteName || '',
+      'Date':                    d => fmtDateOnly(d.receivedAt || d.createdAt),
+      'Time':                    d => fmtTimeOnly(d.receivedAt || d.createdAt),
+      'Date / Time':             d => d.receivedAt ? new Date(d.receivedAt).toLocaleString('en-GB') : '',
+      'Supplier':                d => d.supplier || d.sender || d.company || '',
+      'Vehicle Reg':             d => d.carRegistration || '',
+      'Delivery Document Number':d => d.deliveryDocumentNumber || '',
+      'Product':                 d => d.product || d.itemName || '',
+      'Net Weight':              d => d.netWeight || '',
+      'Image':                   d => d.deliveryImageUrl ? 'Included' : '',
     };
-    const rows = filtered.map(delivery => Object.fromEntries(deliveryExportColumns.map(column => [column, values[column](delivery)])));
-    downloadWorkbook(rows, `${(siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase()}-deliveries-export.xlsx`, 'Deliveries');
+    const rows = filtered.map(delivery => Object.fromEntries(deliveryExportColumns.map(column => [column, values[column]?.(delivery) ?? ''])));
+    const safeSite = (siteName || 'site').replace(/[^a-z0-9-_]+/gi, '-').toLowerCase();
+    const today    = new Date().toISOString().slice(0, 10);
+    downloadWorkbook(rows, `DeliveryReport_${safeSite}_${today}.xlsx`, 'Deliveries');
     toast.success(`Exported ${rows.length} delivery record${rows.length === 1 ? '' : 's'}`);
     setShowExportModal(false);
   };
@@ -1620,6 +1853,17 @@ const DeliveriesTab = ({ siteId, siteName }) => {
       fetchDeliveries();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to update delivery');
+    }
+  };
+
+  const handleDeleteDelivery = async (id) => {
+    if (!window.confirm('Delete this delivery record? This cannot be undone.')) return;
+    try {
+      await api.delete(`/deliveries/${id}`);
+      toast.success('Delivery deleted');
+      fetchDeliveries();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete delivery');
     }
   };
 
@@ -1701,15 +1945,25 @@ const DeliveriesTab = ({ siteId, siteName }) => {
                     ) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {!d.collected && (
+                    <div className="inline-flex items-center gap-2">
+                      {!d.collected && (
+                        <button
+                          type="button"
+                          onClick={() => handleCollect(d._id || d.id)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]"
+                        >
+                          <CheckCircle2 size={13} /> Collect
+                        </button>
+                      )}
                       <button
                         type="button"
-                        onClick={() => handleCollect(d._id || d.id)}
-                        className="inline-flex items-center gap-1 rounded-lg bg-[#2b4594] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#1e326e]"
+                        title="Delete delivery"
+                        onClick={() => handleDeleteDelivery(d._id || d.id)}
+                        className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-500 hover:bg-red-100 hover:text-red-700 transition-colors"
                       >
-                        <CheckCircle2 size={13} /> Collect
+                        <Trash2 size={13} />
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
                 {/* Expandable photo row */}
@@ -1881,10 +2135,10 @@ const DeliveriesTab = ({ siteId, siteName }) => {
             <div className="mb-5">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm font-semibold text-slate-800">Columns to include</p>
-                <button type="button" onClick={() => setDeliveryExportColumns(['Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all</button>
+                <button type="button" onClick={() => setDeliveryExportColumns(['Name', 'Site / Project', 'Date', 'Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'])} className="text-xs font-semibold text-[#2b4594] hover:underline">Select all</button>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {['Name', 'Site / Project', 'Date / Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'].map(column => (
+                {['Name', 'Site / Project', 'Date', 'Time', 'Supplier', 'Vehicle Reg', 'Delivery Document Number', 'Product', 'Net Weight', 'Image'].map(column => (
                   <label key={column} className="flex items-center gap-2 text-sm text-slate-700">
                     <input type="checkbox" checked={deliveryExportColumns.includes(column)} onChange={() => setDeliveryExportColumns(current => current.includes(column) ? current.filter(c => c !== column) : [...current, column])} className="w-4 h-4 accent-[#2b4594]" />
                     {column}

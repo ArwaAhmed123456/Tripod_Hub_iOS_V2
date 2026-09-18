@@ -59,13 +59,22 @@ const DeliveryFormScreen = ({ navigation, route }) => {
     if (!(await requestCameraPermission())) return;
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.6,
+        quality: 0.5,
+        base64: true,
         allowsEditing: false,
       });
       if (!result.canceled && result.assets?.length > 0) {
         const asset = result.assets[0];
-        setDeliveryImage({ uri: asset.uri, type: asset.mimeType || 'image/jpeg', name: `delivery_${Date.now()}.jpg` });
+        const mime = asset.mimeType || 'image/jpeg';
+        const base64Uri = asset.base64
+          ? (asset.base64.startsWith('data:') ? asset.base64 : `data:${mime};base64,${asset.base64}`)
+          : null;
+        setDeliveryImage({
+          uri: asset.uri,
+          type: mime,
+          name: `delivery_${Date.now()}.jpg`,
+          base64: base64Uri,
+        });
       }
     } catch {
       Alert.alert('Error', 'Could not open camera. Please try again.');
@@ -76,13 +85,22 @@ const DeliveryFormScreen = ({ navigation, route }) => {
     if (!(await requestGalleryPermission())) return;
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.6,
+        quality: 0.5,
+        base64: true,
         allowsEditing: false,
       });
       if (!result.canceled && result.assets?.length > 0) {
         const asset = result.assets[0];
-        setDeliveryImage({ uri: asset.uri, type: asset.mimeType || 'image/jpeg', name: `delivery_${Date.now()}.jpg` });
+        const mime = asset.mimeType || 'image/jpeg';
+        const base64Uri = asset.base64
+          ? (asset.base64.startsWith('data:') ? asset.base64 : `data:${mime};base64,${asset.base64}`)
+          : null;
+        setDeliveryImage({
+          uri: asset.uri,
+          type: mime,
+          name: `delivery_${Date.now()}.jpg`,
+          base64: base64Uri,
+        });
       }
     } catch {
       Alert.alert('Error', 'Could not open photo library. Please try again.');
@@ -117,17 +135,22 @@ const DeliveryFormScreen = ({ navigation, route }) => {
         car_registration:         carRegistration.trim(),
         company:                  supplier.trim(),  // legacy alias
         received_at:              receivedAt.toISOString(),
+        delivery_image_base64:    deliveryImage?.base64 || null,
       };
 
-      if (deliveryImage) {
+      if (deliveryImage?.base64) {
+        await api.post('/deliveries', payload);
+      } else if (deliveryImage?.uri) {
         const fd = new FormData();
-        Object.entries(payload).forEach(([k, v]) => fd.append(k, v));
-        fd.append('delivery_image', {
-          uri:  deliveryImage.uri,
-          type: deliveryImage.type,
-          name: deliveryImage.name,
+        Object.entries(payload).forEach(([k, v]) => {
+          if (v !== null && v !== undefined) fd.append(k, String(v));
         });
-        await api.post('/deliveries', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        fd.append('delivery_image', {
+          uri:  Platform.OS === 'ios' ? deliveryImage.uri.replace('file://', '') : deliveryImage.uri,
+          type: deliveryImage.type || 'image/jpeg',
+          name: deliveryImage.name || 'delivery.jpg',
+        });
+        await api.post('/deliveries', fd);
       } else {
         await api.post('/deliveries', payload);
       }
@@ -143,9 +166,7 @@ const DeliveryFormScreen = ({ navigation, route }) => {
   };
 
   // ── Helper: scroll the view up when a field is focused so it stays visible ─
-  // We pass the y-offset of each field's View to scrollRef on focus.
   const scrollToY = (y) => {
-    // Small delay so the keyboard has started animating before we scroll
     setTimeout(() => {
       scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: true });
     }, 120);
@@ -248,21 +269,18 @@ const DeliveryFormScreen = ({ navigation, route }) => {
             placeholder="Car registration number"
             autoCapitalize="characters"
             returnKeyType="next"
-            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 300)}
+            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 270)}
           />
 
           {/* ── Delivery Document Number ── */}
-          <Text style={s.label}>
-            Delivery Document Number{' '}
-            <Text style={s.labelOptional}>(Optional)</Text>
-          </Text>
+          <Text style={s.label}>Delivery Document Number</Text>
           <TextInput
             value={deliveryDocumentNumber}
             onChangeText={setDeliveryDocumentNumber}
             style={s.input}
-            placeholder="Document or reference number"
+            placeholder="e.g. DOC-12345"
             returnKeyType="next"
-            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 400)}
+            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 340)}
           />
 
           {/* ── Product ── */}
@@ -271,22 +289,20 @@ const DeliveryFormScreen = ({ navigation, route }) => {
             value={product}
             onChangeText={setProduct}
             style={s.input}
-            placeholder="Product or cargo description"
+            placeholder="e.g. Steel beams, Concrete, Timber"
             returnKeyType="next"
-            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 500)}
+            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 420)}
           />
 
           {/* ── Net Weight ── */}
-          <Text style={s.label}>
-            Net Weight <Text style={s.labelOptional}>(Optional)</Text>
-          </Text>
+          <Text style={s.label}>Net Weight</Text>
           <TextInput
             value={netWeight}
             onChangeText={setNetWeight}
             style={s.input}
-            placeholder="e.g. 1,250 kg"
+            placeholder="e.g. 1500 kg, 2.5 tonnes"
             returnKeyType="next"
-            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 580)}
+            onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 500)}
           />
 
           {/* ── Description ── */}
@@ -295,8 +311,9 @@ const DeliveryFormScreen = ({ navigation, route }) => {
             value={description}
             onChangeText={setDescription}
             style={[s.input, s.description]}
-            placeholder="Additional details"
+            placeholder="Additional notes or package details"
             multiline
+            numberOfLines={3}
             returnKeyType="done"
             onFocus={(e) => scrollToY(e.nativeEvent?.layout?.y || 660)}
           />
