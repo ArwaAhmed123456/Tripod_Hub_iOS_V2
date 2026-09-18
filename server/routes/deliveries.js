@@ -110,12 +110,16 @@ router.post('/', verifyToken, (req, res) => {
     const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at,
       name, supplier, delivery_document_number, product, net_weight } = req.body;
 
-    // Support both new app schema (name, supplier, product) and old app schema
-    // (item_name, company, description) — old App Store users send item_name/company
-    // with no "name" field; we must not reject their submissions.
-    const deliveryName    = pickFirstValue(name, recipient, company, sender, item_name, description, 'Unknown');
+    // ── Legacy compatibility: old app sends item_name/company/description but no name/recipient
+    // New app sends name/supplier/product. Accept either schema seamlessly.
+    const deliveryName    = pickFirstValue(name, recipient, company, item_name, description);
     const deliverySupplier = pickFirstValue(supplier, company, sender);
-    const deliveryProduct  = pickFirstValue(product, item_name, description, name, 'Item');
+    const deliveryProduct  = pickFirstValue(product, item_name, description);
+
+    // Only hard-fail if we truly have nothing to identify the delivery
+    if (!deliveryName && !deliveryProduct) {
+      return res.status(400).json({ error: 'Please provide at least a name or item name' });
+    }
 
     try {
       let siteId = site_id;
@@ -168,9 +172,7 @@ router.post('/', verifyToken, (req, res) => {
 
       const delivery = await Delivery.create({
         siteId,
-        // Keep both representations in sync while clients transition to the
-        // agreed Cargo form terminology.
-        recipient: deliveryName,
+        recipient: deliveryName || deliveryProduct,   // old app: item_name becomes the recipient fallback
         sender: pickFirstValue(sender, deliverySupplier), carrier: carrier || '', notes: notes || description || '',
         itemName: deliveryProduct, description: description || '',
         carRegistration: car_registration || '', company: pickFirstValue(company, deliverySupplier), receivedAt,
@@ -178,7 +180,7 @@ router.post('/', verifyToken, (req, res) => {
         deliveryImageBase64,
         supplier: deliverySupplier,
         deliveryDocumentNumber: delivery_document_number || '',
-        product: deliveryProduct,
+        product: deliveryProduct || deliveryName,    // old app: if no product field, use item_name/name
         netWeight: net_weight || '',
       });
 
