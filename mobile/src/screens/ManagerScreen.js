@@ -337,11 +337,13 @@ const ManagerScreen = ({ navigation, route }) => {
       const isDeliveryReport = activeTab === 'Deliveries';
       const reportTitle = isDeliveryReport
         ? `Delivery Report`
-        : `Security Report — ${activeTab}`;
+        : `Security Report`;
 
       const filename = isDeliveryReport
         ? `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`
         : `Security_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
+
+      const normaliseRole = (raw) => ({ Employees: 'Employee', Visitors: 'Visitor', Workers: 'Worker', Contractors: 'Contractor', Deliveries: 'Delivery' }[raw] || raw || '—');
 
       const columns = isDeliveryReport
         ? [
@@ -349,7 +351,6 @@ const ManagerScreen = ({ navigation, route }) => {
             { label: 'Site / Project', getVal: () => siteName },
             { label: 'Date', getVal: (item) => fmtExportDateOnly(item.receivedAt || item.createdAt) },
             { label: 'Time', getVal: (item) => fmtExportTimeOnly(item.receivedAt || item.createdAt) },
-            { label: 'Duration', getVal: (item) => fmtExportDuration(item.receivedAt || item.createdAt, item.collectedAt) },
             { label: 'Supplier', getVal: (item) => item.supplier || item.company || item.sender || '—' },
             { label: 'Vehicle Reg', getVal: (item) => item.carRegistration || item.car_reg || '—' },
             { label: 'Delivery Doc No.', getVal: (item) => item.deliveryDocumentNumber || item.delivery_document_number || '—' },
@@ -359,7 +360,7 @@ const ManagerScreen = ({ navigation, route }) => {
         : [
             { label: 'Date', getVal: (item) => fmtExportDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
             { label: 'Name', getVal: (item) => item.name || '—' },
-            { label: 'Role', getVal: (item) => item.group || item.visitor_group_name || '—' },
+            { label: 'Role', getVal: (item) => normaliseRole(item.group || item.visitor_group_name) },
             { label: 'Sign In', getVal: (item) => fmtExportTimeOnly(item.sign_in_time) },
             { label: 'Sign Out', getVal: (item) => fmtExportTimeOnly(item.sign_out_time) },
             { label: 'Duration', getVal: (item) => fmtExportDuration(item.sign_in_time, item.sign_out_time) },
@@ -397,10 +398,16 @@ const ManagerScreen = ({ navigation, route }) => {
   <meta charset="utf-8" />
   <title>${escapeHtml(filename)}</title>
   <style>
-    @page { margin: 0; size: A4 landscape; }
+    @page {
+      margin: 15mm 15mm 22mm 15mm;
+      size: A4 landscape;
+      @bottom-left   { content: "Tripod Services · Official ${isDeliveryReport ? 'Delivery' : 'Security'} Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-center { content: "${escapeHtml(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    }
     * { box-sizing: border-box; }
     body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #111827; margin: 0; padding: 0; }
-    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
+    .report-shell { padding: 0; box-sizing: border-box; width: 100%; }
     table { width: 100%; border-collapse: collapse; font-size: 11px; }
     th { background: #1e3a8a; color: #ffffff; padding: 9px 10px; text-align: left; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
     td { border-bottom: 1px solid #e5e7eb; vertical-align: top; }
@@ -413,8 +420,6 @@ const ManagerScreen = ({ navigation, route }) => {
     .report-count { text-align:right; font-size:11px; color:#64748b; }
     .report-count strong { display:block; font-size:22px; font-weight:700; color:#1e3a8a; }
     .report-end { margin-top:22px; padding-top:10px; border-top:1px solid #cbd5e1; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-align:center; }
-    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
-    .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
 <body>
@@ -444,13 +449,6 @@ const ManagerScreen = ({ navigation, route }) => {
     </table>
 
     <div class="report-end">End of report</div>
-  </div>
-
-  <!-- ── Footer ── -->
-  <div class="footer">
-    <span>Tripod Services &nbsp;·&nbsp; Official ${isDeliveryReport ? 'Delivery' : 'Security'} Report</span>
-    <span>${escapeHtml(siteName)}</span>
-    <span class="page-number"></span>
   </div>
 
 </body>

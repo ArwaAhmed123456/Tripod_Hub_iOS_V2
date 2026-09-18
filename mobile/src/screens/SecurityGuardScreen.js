@@ -372,7 +372,7 @@ const SecurityGuardScreen = ({ navigation }) => {
       const siteName = selectedSite?.name || 'Site';
       const tabName  = activeTab;
       const SERVER_BASE = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com';
-      const reportTitle = `Security Report — ${tabName}`;
+      const reportTitle = `Security Report`;
 
       // If date filters are set, fetch a date-filtered list from the API
       let exportList;
@@ -396,15 +396,18 @@ const SecurityGuardScreen = ({ navigation }) => {
         return;
       }
 
+      // ── Role normalisation ────────────────────────────────────────────────
+      const normaliseRole = (raw) => ({ Employees: 'Employee', Visitors: 'Visitor', Workers: 'Worker', Contractors: 'Contractor', Deliveries: 'Delivery' }[raw] || raw || '—');
+
       // ── Build Dynamic Columns ─────────────────────────────────────────────
       // Core columns always included with proportional weights and nowrap rules:
       const columns = [
-        { label: 'Date', key: 'date', weight: 10, nowrap: true, getVal: (item) => fmtDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
+        { label: 'Date', key: 'date', weight: 12, nowrap: true, getVal: (item) => fmtDateOnly(item.sign_in_time || item.expected_date || item.createdAt) },
         { label: 'Name', key: 'name', weight: 18, nowrap: false, getVal: (item) => item.name || '—' },
-        { label: 'Role', key: 'role', weight: 10, nowrap: false, getVal: (item) => item.group || item.visitor_group_name || '—' },
+        { label: 'Role', key: 'role', weight: 10, nowrap: false, getVal: (item) => normaliseRole(item.group || item.visitor_group_name) },
         { label: 'Sign In', key: 'signIn', weight: 8, nowrap: true, getVal: (item) => fmtTimeOnly(item.sign_in_time) },
         { label: 'Sign Out', key: 'signOut', weight: 8, nowrap: true, getVal: (item) => fmtTimeOnly(item.sign_out_time) },
-        { label: 'Duration', key: 'duration', weight: 8, nowrap: true, getVal: (item) => fmtDuration(item.sign_in_time, item.sign_out_time) },
+        { label: 'Duration', key: 'duration', weight: 10, nowrap: true, getVal: (item) => fmtDuration(item.sign_in_time, item.sign_out_time) },
         { label: 'Company Name', key: 'company', weight: 14, nowrap: false, getVal: (item) => item.employee_company_name || item.employeeCompanyName || item.trade || item.company_name || '—' },
       ];
 
@@ -462,10 +465,16 @@ const SecurityGuardScreen = ({ navigation }) => {
   <meta charset="utf-8" />
   <title>${escapeHtml(filename)}</title>
   <style>
-    @page { margin: 0; size: A4 landscape; }
+    @page {
+      margin: 15mm 15mm 22mm 15mm;
+      size: A4 landscape;
+      @bottom-left   { content: "Tripod Services · Official Security Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-center { content: "${escapeHtml(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111827; background: #ffffff; }
-    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
+    .report-shell { padding: 0; box-sizing: border-box; width: 100%; }
     table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
     th { background: #1e3a8a; color: #ffffff; padding: 9px 8px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; }
     td { border-bottom: 1px solid #e2e8f0; padding: 9px 8px; vertical-align: middle; line-height: 1.35; overflow: hidden; word-break: break-word; color: #1e293b; }
@@ -478,8 +487,6 @@ const SecurityGuardScreen = ({ navigation }) => {
     .report-count { text-align: right; font-size: 11px; color: #64748b; }
     .report-count strong { display: block; font-size: 24px; font-weight: 700; color: #1e3a8a; }
     .report-end { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
-    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
-    .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
 <body>
@@ -509,13 +516,6 @@ const SecurityGuardScreen = ({ navigation }) => {
     </table>
 
     <div class="report-end">End of report</div>
-  </div>
-
-  <!-- ── Footer ── -->
-  <div class="footer">
-    <span>Tripod Services &nbsp;·&nbsp; Official Security Report</span>
-    <span>${escapeHtml(siteName)}</span>
-    <span class="page-number"></span>
   </div>
 
 </body>

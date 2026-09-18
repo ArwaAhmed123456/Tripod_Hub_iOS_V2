@@ -214,16 +214,15 @@ export default function DeliveriesScreen({ navigation, route }) {
     try {
       // ── Report columns with proportional widths & formatting ───────────
       const delColumns = [
-        { label: 'Name', width: '13%', nowrap: false },
-        { label: 'Site / Project', width: '11%', nowrap: false },
-        { label: 'Date', width: '8%', nowrap: true },
-        { label: 'Time', width: '6%', nowrap: true },
-        { label: 'Duration', width: '7%', nowrap: true },
-        { label: 'Supplier', width: '12%', nowrap: false },
-        { label: 'Vehicle Reg', width: '10%', nowrap: true },
-        { label: 'Delivery Doc No.', width: '11%', nowrap: false },
-        { label: 'Product', width: '13%', nowrap: false },
-        { label: 'Net Weight', width: '9%', nowrap: true },
+        { label: 'Name', width: '14%', nowrap: false },
+        { label: 'Site / Project', width: '12%', nowrap: false },
+        { label: 'Date', width: '9%', nowrap: true },
+        { label: 'Time', width: '7%', nowrap: true },
+        { label: 'Supplier', width: '13%', nowrap: false },
+        { label: 'Vehicle Reg', width: '11%', nowrap: true },
+        { label: 'Delivery Doc No.', width: '12%', nowrap: false },
+        { label: 'Product', width: '14%', nowrap: false },
+        { label: 'Net Weight', width: '8%', nowrap: true },
       ];
 
       const theadHtml = delColumns
@@ -235,16 +234,15 @@ export default function DeliveriesScreen({ navigation, route }) {
           const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
           const arrival = d.receivedAt || d.createdAt;
           return `<tr style="background:${bg}">
-            <td style="width:13%"><strong style="color:#0f172a">${esc(getDeliveryName(d))}</strong></td>
-            <td style="width:11%">${esc(siteName)}</td>
-            <td style="width:8%;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
-            <td style="width:6%;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
-            <td style="width:7%;white-space:nowrap">${esc(fmtDuration(arrival, d.collectedAt))}</td>
-            <td style="width:12%">${esc(getDeliverySupplier(d))}</td>
-            <td style="width:10%;white-space:nowrap">${esc(getVehicleRegistration(d))}</td>
-            <td style="width:11%">${esc(getDeliveryDocumentNumber(d))}</td>
-            <td style="width:13%">${esc(getDeliveryProduct(d))}</td>
-            <td style="width:9%;white-space:nowrap">${esc(getNetWeight(d))}</td>
+            <td style="width:14%"><strong style="color:#0f172a">${esc(getDeliveryName(d))}</strong></td>
+            <td style="width:12%">${esc(siteName)}</td>
+            <td style="width:9%;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
+            <td style="width:7%;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
+            <td style="width:13%">${esc(getDeliverySupplier(d))}</td>
+            <td style="width:11%;white-space:nowrap">${esc(getVehicleRegistration(d))}</td>
+            <td style="width:12%">${esc(getDeliveryDocumentNumber(d))}</td>
+            <td style="width:14%">${esc(getDeliveryProduct(d))}</td>
+            <td style="width:8%;white-space:nowrap">${esc(getNetWeight(d))}</td>
           </tr>`;
         })
         .join('');
@@ -299,10 +297,16 @@ export default function DeliveriesScreen({ navigation, route }) {
   <meta charset="utf-8" />
   <title>${esc(filename)}</title>
   <style>
-    @page { margin: 0; size: A4 landscape; }
+    @page {
+      margin: 15mm 15mm 22mm 15mm;
+      size: A4 landscape;
+      @bottom-left   { content: "Tripod Services · Official Delivery Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-center { content: "${escapeHtml(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111827; background: #ffffff; }
-    .report-shell { padding: 15mm 15mm 22mm 15mm; box-sizing: border-box; width: 100%; }
+    .report-shell { padding: 0; box-sizing: border-box; width: 100%; }
     table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
     th { background: #1e3a8a; color: #ffffff; padding: 9px 8px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; }
     td { border-bottom: 1px solid #e2e8f0; padding: 9px 8px; vertical-align: middle; line-height: 1.35; overflow: hidden; word-break: break-word; color: #1e293b; }
@@ -315,8 +319,6 @@ export default function DeliveriesScreen({ navigation, route }) {
     .report-count { text-align: right; font-size: 11px; color: #64748b; }
     .report-count strong { display: block; font-size: 24px; font-weight: 700; color: #1e3a8a; }
     .report-end { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
-    .footer { position: fixed; left: 15mm; right: 15mm; bottom: 8mm; border-top: 1px solid #e2e8f0; padding-top: 8px; display: flex; justify-content: space-between; font-size: 10px; color: #64748b; background: #ffffff; }
-    .page-number::after { content: "Page " counter(page); }
   </style>
 </head>
 <body>
@@ -348,13 +350,6 @@ export default function DeliveriesScreen({ navigation, route }) {
     ${imageSection}
 
     <div class="report-end">End of report</div>
-  </div>
-
-  <!-- ── Footer ── -->
-  <div class="footer">
-    <span>Tripod Services &nbsp;·&nbsp; Official Delivery Report</span>
-    <span>${esc(siteName)}</span>
-    <span class="page-number"></span>
   </div>
 
 </body>
