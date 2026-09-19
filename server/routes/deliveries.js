@@ -109,13 +109,14 @@ router.post('/', verifyToken, (req, res) => {
 
     const { site_id, recipient, sender, carrier, notes, item_name, description, car_registration, company, received_at,
       name, supplier, delivery_document_number, product, net_weight } = req.body;
-    // Support both old app schema (item_name, company, no name field) and new schema (name, supplier, product)
-    // Old app sends: item_name, description, car_registration, company, received_at
-    // New app sends: name, supplier, product, delivery_document_number, net_weight, car_registration
-    const deliveryName = pickFirstValue(name, recipient, company, sender, 'Unknown');
+    // Old app sends: item_name, description, car_registration, company, received_at (no "name" or "product")
+    // New app sends: name, supplier, product, delivery_document_number, net_weight, received_at
+    // pickFirstValue handles both — try every plausible field in priority order
+    const deliveryName = pickFirstValue(name, recipient, company, sender);
     const deliverySupplier = pickFirstValue(supplier, company, sender);
     const deliveryProduct = pickFirstValue(product, item_name, description);
-    if (!deliveryProduct) return res.status(400).json({ error: 'product or item_name is required' });
+    if (!deliveryName) return res.status(400).json({ error: 'name is required' });
+    if (!deliveryProduct) return res.status(400).json({ error: 'product is required' });
 
     try {
       let siteId = site_id;
