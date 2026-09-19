@@ -140,6 +140,13 @@ export default function DeliveriesScreen({ navigation, route }) {
   const [exportFormat, setExportFormat] = useState('pdf');
   const [exportIncludePhotos, setExportIncludePhotos] = useState(true);
   const [exporting, setExporting] = useState(false);
+  // Column selector — optional fields user can toggle per export
+  const OPTIONAL_COLS = ['Supplier', 'Vehicle Reg', 'Delivery Doc No.', 'Product', 'Net Weight', 'Image'];
+  const [exportOptionalCols, setExportOptionalCols] = useState(
+    Object.fromEntries(OPTIONAL_COLS.map((c) => [c, c !== 'Delivery Doc No.' && c !== 'Net Weight']))
+  );
+  const toggleOptionalCol = (col) =>
+    setExportOptionalCols((prev) => ({ ...prev, [col]: !prev[col] }));
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const load = useCallback(async () => {
@@ -201,95 +208,133 @@ export default function DeliveriesScreen({ navigation, route }) {
   };
 
   // ── Export ────────────────────────────────────────────────────────────────
+  // Fetch a delivery's base64 image from the full single-record endpoint.
+  // expo-print WebView cannot make network requests, so we must embed base64.
+  const fetchImageBase64 = async (d) => {
+    // Already have base64 in memory
+    if (d.deliveryImageBase64?.startsWith('data:')) return d.deliveryImageBase64;
+    if (!d.deliveryImageUrl && !(d._id || d.id)) return null;
+    try {
+      // Fetch the full record — list API excludes deliveryImageBase64 for perf
+      const resp = await api.get(`/deliveries/${d._id || d.id}`);
+      if (resp.data?.deliveryImageBase64?.startsWith('data:')) return resp.data.deliveryImageBase64;
+      // Fallback: fetch the image file and convert to base64 via FileSystem
+      const imgUrl = resp.data?.deliveryImageUrl || d.deliveryImageUrl;
+      if (!imgUrl) return null;
+      const fullUrl = imgUrl.startsWith('http')
+        ? imgUrl
+        : `${api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'https://tripod-signin-app.onrender.com'}${imgUrl.startsWith('/') ? '' : '/'}${imgUrl}`;
+      const dlResult = await FileSystem.downloadAsync(
+        fullUrl,
+        FileSystem.cacheDirectory + `img_${Date.now()}.jpg`,
+      );
+      const b64 = await FileSystem.readAsStringAsync(dlResult.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      await FileSystem.deleteAsync(dlResult.uri, { idempotent: true });
+      return `data:image/jpeg;base64,${b64}`;
+    } catch {
+      return null;
+    }
+  };
+
   const exportReport = async (
     format,
     reportItems = list,
     reportTitle = 'Delivery Report',
     includePhotos = true,
+    selectedCols = null, // null = use exportOptionalCols state
   ) => {
     if (!reportItems.length) {
       return Alert.alert('Nothing to export', 'No deliveries match the current filters.');
     }
     setExporting(true);
     try {
-      // ── Report columns with proportional widths & formatting ───────────
-      const delColumns = [
-        { label: 'Name', width: '14%', nowrap: false },
-        { label: 'Site / Project', width: '12%', nowrap: false },
-        { label: 'Date', width: '9%', nowrap: true },
-        { label: 'Time', width: '7%', nowrap: true },
-        { label: 'Supplier', width: '13%', nowrap: false },
-        { label: 'Vehicle Reg', width: '11%', nowrap: true },
-        { label: 'Delivery Doc No.', width: '12%', nowrap: false },
-        { label: 'Product', width: '14%', nowrap: false },
-        { label: 'Net Weight', width: '8%', nowrap: true },
+      // ── Determine which optional columns to include ────────────────────
+      // Core columns are always present; optional ones come from the selector.
+      const optCols = selectedCols || exportOptionalCols;
+
+      // All possible optional column definitions
+      const optionalColDefs = {
+        'Supplier':          { nowrap: false, getVal: (d) => getDeliverySupplier(d) },
+        'Vehicle Reg':       { nowrap: true,  getVal: (d) => getVehicleRegistration(d) },
+        'Delivery Doc No.':  { nowrap: false, getVal: (d) => getDeliveryDocumentNumber(d) },
+        'Product':           { nowrap: false, getVal: (d) => getDeliveryProduct(d) },
+        'Net Weight':        { nowrap: true,  getVal: (d) => getNetWeight(d) },
+      };
+
+      // Skip optional columns where every row is "—" (no data at all)
+      const activeOptional = Object.entries(optionalColDefs)
+        .filter(([label]) => optCols[label])
+        .filter(([, def]) => reportItems.some((d) => def.getVal(d) !== '—'));
+
+      // Build final column list with proportional weights
+      const coreWeights  = { 'Name': 18, 'Site / Project': 13, 'Date': 12, 'Time': 7 };
+      const optWeights   = { 'Supplier': 14, 'Vehicle Reg': 11, 'Delivery Doc No.': 13, 'Product': 14, 'Net Weight': 9 };
+      const activeCols   = [
+        { label: 'Name',           nowrap: false, getVal: (d) => `<strong>${esc(getDeliveryName(d))}</strong>` },
+        { label: 'Site / Project', nowrap: false, getVal: () => esc(siteName) },
+        { label: 'Date',           nowrap: true,  getVal: (d) => esc(fmtDateOnly(d.receivedAt || d.createdAt)) },
+        { label: 'Time',           nowrap: true,  getVal: (d) => esc(fmtTimeOnly(d.receivedAt || d.createdAt)) },
+        ...activeOptional.map(([label, def]) => ({
+          label,
+          nowrap: def.nowrap,
+          getVal: (d) => esc(def.getVal(d)),
+        })),
       ];
 
-      const theadHtml = delColumns
-        .map((col) => `<th style="width:${col.width}">${esc(col.label)}</th>`)
+      const totalWeight = activeCols.reduce((s, c) => s + (coreWeights[c.label] || optWeights[c.label] || 10), 0);
+      const colWidths   = activeCols.map((c) =>
+        ((((coreWeights[c.label] || optWeights[c.label] || 10) / totalWeight) * 100)).toFixed(1) + '%'
+      );
+
+      const theadHtml = activeCols
+        .map((col, i) => `<th style="width:${colWidths[i]}">${esc(col.label)}</th>`)
         .join('');
 
-      const rows = reportItems
-        .map((d, idx) => {
-          const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
-          const arrival = d.receivedAt || d.createdAt;
-          return `<tr style="background:${bg}">
-            <td style="width:14%"><strong style="color:#0f172a">${esc(getDeliveryName(d))}</strong></td>
-            <td style="width:12%">${esc(siteName)}</td>
-            <td style="width:9%;white-space:nowrap">${esc(fmtDateOnly(arrival))}</td>
-            <td style="width:7%;white-space:nowrap">${esc(fmtTimeOnly(arrival))}</td>
-            <td style="width:13%">${esc(getDeliverySupplier(d))}</td>
-            <td style="width:11%;white-space:nowrap">${esc(getVehicleRegistration(d))}</td>
-            <td style="width:12%">${esc(getDeliveryDocumentNumber(d))}</td>
-            <td style="width:14%">${esc(getDeliveryProduct(d))}</td>
-            <td style="width:8%;white-space:nowrap">${esc(getNetWeight(d))}</td>
-          </tr>`;
-        })
-        .join('');
+      const rows = reportItems.map((d, idx) => {
+        const bg = idx % 2 === 0 ? '#ffffff' : '#f8fafc';
+        const cells = activeCols.map((col, i) =>
+          `<td style="width:${colWidths[i]};${col.nowrap ? 'white-space:nowrap;' : ''}">${col.getVal(d)}</td>`
+        ).join('');
+        return `<tr style="background:${bg}">${cells}</tr>`;
+      }).join('');
 
-      // ── Delivery picture section ─────────────────────────────────────────
-      const singleDelivery = reportItems.length === 1 ? reportItems[0] : null;
+      // ── Images: fetch base64 for every delivery that has a photo ────────
       let imageSection = '';
-      const singleImg = singleDelivery ? getDeliveryImageSrc(singleDelivery) : null;
-      if (includePhotos && singleImg) {
-        imageSection = `
-          <div style="margin-top:28px;page-break-inside:avoid">
-            <h3 style="font-size:13px;color:#374151;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px">Delivery Picture</h3>
-            <img src="${singleImg}"
-              style="max-width:400px;max-height:280px;border:1px solid #e2e8f0;border-radius:8px;display:block" />
-          </div>`;
-      } else if (includePhotos && reportItems.length > 1) {
-        const withPics = reportItems.filter((d) => getDeliveryImageSrc(d));
-        if (withPics.length > 0) {
-          imageSection = `
-          <div style="margin-top:32px;page-break-before:always">
-            <h3 style="font-size:15px;color:#111827;margin-bottom:14px">Attached Delivery Pictures</h3>
-            <div style="display:flex;flex-wrap:wrap;gap:16px">
-              ${withPics.map((d) => `
-                <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:260px;page-break-inside:avoid">
-                  <div style="font-size:12px;font-weight:bold;color:#374151;margin-bottom:6px">
-                    ${esc(getDeliveryName(d))} — ${esc(getDeliverySupplier(d))}
-                  </div>
-                  <img src="${getDeliveryImageSrc(d)}"
-                    style="width:100%;height:170px;object-fit:cover;border-radius:6px" />
-                </div>`).join('')}
-            </div>
-          </div>`;
+      const wantImage = includePhotos && (selectedCols ? selectedCols['Image'] : optCols['Image']);
+      if (wantImage) {
+        const withImg = reportItems.filter((d) => d.deliveryImageUrl || d.deliveryImageBase64);
+        if (withImg.length > 0) {
+          // Fetch all images in parallel (cap 20 to keep PDF size reasonable)
+          const resolved = await Promise.all(
+            withImg.slice(0, 20).map(async (d) => ({ d, src: await fetchImageBase64(d) }))
+          );
+          const validImgs = resolved.filter(({ src }) => !!src);
+          if (validImgs.length > 0) {
+            const cards = validImgs.map(({ d, src }) => `
+              <div style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;width:260px;page-break-inside:avoid;display:inline-block;vertical-align:top">
+                <div style="font-size:11px;font-weight:700;color:#374151;margin-bottom:6px">
+                  ${esc(getDeliveryName(d))} &mdash; ${esc(getDeliveryProduct(d))}
+                </div>
+                <img src="${src}" style="width:100%;height:160px;object-fit:cover;border-radius:6px;display:block" />
+              </div>`).join('');
+            imageSection = `
+              <div style="margin-top:32px;page-break-before:${validImgs.length > 3 ? 'always' : 'avoid'}">
+                <h3 style="font-size:13px;color:#374151;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;padding-bottom:6px">Delivery Pictures</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:14px">${cards}</div>
+              </div>`;
+          }
         }
       }
 
-      // ── Period label ─────────────────────────────────────────────────────
-      const periodLabel =
-        dateFrom || dateTo
-          ? `${dateFrom ? formatDateShort(dateFrom) : 'All dates'} — ${dateTo ? formatDateShort(dateTo) : 'Today'}`
-          : 'All dates';
-
-      // ── Full HTML ────────────────────────────────────────────────────────
-      const generatedOn = new Date().toLocaleString('en-GB', {
-        dateStyle: 'long', timeStyle: 'short',
-      });
-      const totalRows = reportItems.length;
-      const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
+      // ── Period label & metadata ──────────────────────────────────────────
+      const periodLabel = dateFrom || dateTo
+        ? `${dateFrom ? formatDateShort(dateFrom) : 'All dates'} \u2014 ${dateTo ? formatDateShort(dateTo) : 'Today'}`
+        : 'All dates';
+      const generatedOn = new Date().toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' });
+      const totalRows   = reportItems.length;
+      const filename    = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.pdf`;
 
       const html = `<!DOCTYPE html>
 <html>
@@ -298,88 +343,63 @@ export default function DeliveriesScreen({ navigation, route }) {
   <title>${esc(filename)}</title>
   <style>
     @page {
-      margin: 15mm 15mm 22mm 15mm;
+      margin: 16mm 16mm 22mm 16mm;
       size: A4 landscape;
-      @bottom-left   { content: "Tripod Services · Official Delivery Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
+      @bottom-left   { content: "Tripod Services \u00b7 Official Delivery Report"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
       @bottom-center { content: "${esc(siteName)}"; font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
       @bottom-right  { content: "Page " counter(page); font-family: Arial, sans-serif; font-size: 9px; color: #64748b; }
     }
     * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 11px; color: #111827; background: #ffffff; }
-    .report-shell { padding: 0; box-sizing: border-box; width: 100%; }
-    table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
-    th { background: #1e3a8a; color: #ffffff; padding: 9px 8px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; overflow: hidden; }
-    td { border-bottom: 1px solid #e2e8f0; padding: 9px 8px; vertical-align: middle; line-height: 1.35; overflow: hidden; word-break: break-word; color: #1e293b; }
-    .report-head { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid #1e3a8a; padding-bottom: 14px; margin-bottom: 18px; }
-    .report-head img { height: 52px; max-width: 180px; object-fit: contain; }
-    .report-head-copy { flex: 1; }
-    .company-name { margin: 0 0 4px; font-size: 12px; font-weight: 700; letter-spacing: 1.1px; text-transform: uppercase; color: #1e3a8a; }
-    .report-title { margin: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
-    .report-meta { margin: 5px 0 0; font-size: 11px; color: #64748b; }
-    .report-count { text-align: right; font-size: 11px; color: #64748b; }
-    .report-count strong { display: block; font-size: 24px; font-weight: 700; color: #1e3a8a; }
-    .report-end { margin-top: 24px; padding-top: 10px; border-top: 1px solid #cbd5e1; font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
+    html, body { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #111827; background: #fff; }
+    .shell { width: 100%; }
+    table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 10.5px; }
+    th { background: #1e3a8a; color: #fff; padding: 9px 7px; text-align: left; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; overflow: hidden; }
+    td { border-bottom: 1px solid #e2e8f0; padding: 9px 7px; vertical-align: top; line-height: 1.4; word-break: break-word; color: #1e293b; }
+    tr:nth-child(odd)  td { background: #f8fafc; }
+    tr:nth-child(even) td { background: #ffffff; }
+    .hdr { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #1e3a8a; padding-bottom: 12px; margin-bottom: 16px; }
+    .hdr img { height: 50px; max-width: 170px; object-fit: contain; flex-shrink: 0; }
+    .hdr-copy { flex: 1; min-width: 0; }
+    .co { margin: 0 0 3px; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #1e3a8a; }
+    .hdr-copy h2 { margin: 0; font-size: 21px; font-weight: 700; color: #0f172a; }
+    .hdr-copy p { margin: 4px 0 0; font-size: 10px; color: #64748b; }
+    .badge { text-align: right; flex-shrink: 0; padding-left: 10px; font-size: 10px; color: #64748b; }
+    .badge strong { display: block; font-size: 26px; font-weight: 700; color: #1e3a8a; line-height: 1; }
+    .end { margin-top: 22px; padding-top: 9px; border-top: 1px solid #cbd5e1; font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #64748b; text-align: center; }
   </style>
 </head>
 <body>
-  <div class="report-shell">
-    <!-- ── Header ── -->
-    <div class="report-head">
-      <img src="${TRIPOD_LOGO_BASE64}" alt="Tripod Services logo" />
-      <div class="report-head-copy">
-        <p class="company-name">Tripod Services</p>
-        <h2 class="report-title">${esc(reportTitle)}</h2>
-        <p class="report-meta">
-          ${esc(siteName)} &nbsp;·&nbsp; Period: ${esc(periodLabel)} &nbsp;·&nbsp; Generated ${esc(generatedOn)}
-        </p>
-      </div>
-      <div class="report-count">
-        <strong>${totalRows}</strong>
-        <div>record${totalRows !== 1 ? 's' : ''}</div>
-      </div>
+<div class="shell">
+  <div class="hdr">
+    <img src="${TRIPOD_LOGO_BASE64}" alt="Tripod Services" />
+    <div class="hdr-copy">
+      <p class="co">Tripod Services</p>
+      <h2>${esc(reportTitle)}</h2>
+      <p>${esc(siteName)} &nbsp;&middot;&nbsp; Period: ${esc(periodLabel)} &nbsp;&middot;&nbsp; Generated ${esc(generatedOn)}</p>
     </div>
-
-    <!-- ── Table ── -->
-    <table>
-      <thead>
-        <tr>${theadHtml}</tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>
-
-    ${imageSection}
-
-    <div class="report-end">End of report</div>
+    <div class="badge"><strong>${totalRows}</strong>record${totalRows !== 1 ? 's' : ''}</div>
   </div>
-
+  <table>
+    <thead><tr>${theadHtml}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  ${imageSection}
+  <div class="end">End of report</div>
+</div>
 </body>
 </html>`;
 
       if (format === 'pdf') {
-        // Generate to a temp URI first, then copy with a descriptive name
         const { uri: tempUri } = await Print.printToFileAsync({ html, base64: false });
         const destUri = `${FileSystem.documentDirectory || FileSystem.cacheDirectory}${filename}`;
-
         await FileSystem.deleteAsync(destUri, { idempotent: true });
         await FileSystem.copyAsync({ from: tempUri, to: destUri });
-
-        await Sharing.shareAsync(destUri, {
-          mimeType:    'application/pdf',
-          dialogTitle: 'Delivery Report (PDF)',
-          UTI:         'com.adobe.pdf',
-        });
+        await Sharing.shareAsync(destUri, { mimeType: 'application/pdf', dialogTitle: 'Delivery Report (PDF)', UTI: 'com.adobe.pdf' });
       } else {
-        // Excel — named file
-        const filename = `Delivery_Report_${safeFilename(siteName)}_${formatDateFile(new Date())}.xls`;
-        const destUri  = FileSystem.cacheDirectory + filename;
-
-        await FileSystem.writeAsStringAsync(destUri, html, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
-        await Sharing.shareAsync(destUri, {
-          mimeType:    'application/vnd.ms-excel',
-          dialogTitle: 'Delivery Report (Excel)',
-        });
+        const xlsName = filename.replace(/\.pdf$/, '.xls');
+        const destUri = (FileSystem.cacheDirectory || FileSystem.documentDirectory) + xlsName;
+        await FileSystem.writeAsStringAsync(destUri, html, { encoding: FileSystem.EncodingType.UTF8 });
+        await Sharing.shareAsync(destUri, { mimeType: 'application/vnd.ms-excel', dialogTitle: 'Delivery Report (Excel)' });
       }
     } catch (err) {
       Alert.alert('Export failed', err.message || 'Could not create the report.');
@@ -458,11 +478,13 @@ export default function DeliveriesScreen({ navigation, route }) {
               Alert.alert('Download this delivery', 'Choose a format', [
                 {
                   text: 'PDF',
-                  onPress: () => exportReport('pdf', [d], 'Delivery Details', detailIncludePhoto),
+                  onPress: () => exportReport('pdf', [d], 'Delivery Details', detailIncludePhoto,
+                    { Supplier: true, 'Vehicle Reg': true, 'Delivery Doc No.': true, Product: true, 'Net Weight': true, Image: detailIncludePhoto }),
                 },
                 {
                   text: 'Excel (.xls)',
-                  onPress: () => exportReport('excel', [d], 'Delivery Details', false),
+                  onPress: () => exportReport('excel', [d], 'Delivery Details', false,
+                    { Supplier: true, 'Vehicle Reg': true, 'Delivery Doc No.': true, Product: true, 'Net Weight': true, Image: false }),
                 },
                 { text: 'Cancel', style: 'cancel' },
               ])
@@ -591,43 +613,48 @@ export default function DeliveriesScreen({ navigation, route }) {
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: '#64748b' }}>Choose file format:</Text>
+            {/* Format selector */}
+            <Text style={s.modalSectionLabel}>Format</Text>
             <View style={s.formatRow}>
               <TouchableOpacity
                 style={[s.formatBtn, exportFormat === 'pdf' && s.formatBtnActive]}
                 onPress={() => setExportFormat('pdf')}
               >
-                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>
-                  PDF Document
-                </Text>
+                <Text style={[s.formatBtnText, exportFormat === 'pdf' && s.formatBtnTextActive]}>PDF</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.formatBtn, exportFormat === 'excel' && s.formatBtnActive]}
                 onPress={() => setExportFormat('excel')}
               >
-                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>
-                  Excel (.xls)
-                </Text>
+                <Text style={[s.formatBtnText, exportFormat === 'excel' && s.formatBtnTextActive]}>Excel (.xls)</Text>
               </TouchableOpacity>
             </View>
 
-            {exportFormat === 'pdf' && (
-              <View style={s.photoToggleRow}>
-                <Text style={s.photoToggleLabel}>Include delivery pictures</Text>
-                <Switch
-                  value={exportIncludePhotos}
-                  onValueChange={setExportIncludePhotos}
-                  trackColor={{ false: '#cbd5e1', true: '#93c5fd' }}
-                  thumbColor={exportIncludePhotos ? '#2b4594' : '#f1f5f9'}
-                />
-              </View>
-            )}
+            {/* Optional column selector */}
+            <Text style={s.modalSectionLabel}>Columns to include</Text>
+            <View style={s.colGrid}>
+              {OPTIONAL_COLS.map((col) => (
+                <TouchableOpacity
+                  key={col}
+                  style={s.colChip}
+                  onPress={() => toggleOptionalCol(col)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[s.colChipCheck, exportOptionalCols[col] && s.colChipCheckActive]}>
+                    {exportOptionalCols[col] && <Text style={s.colChipTick}>✓</Text>}
+                  </View>
+                  <Text style={[s.colChipLabel, exportOptionalCols[col] && s.colChipLabelActive]}>
+                    {col}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <TouchableOpacity
               style={s.confirmBtn}
               onPress={() => {
                 setShowExportModal(false);
-                exportReport(exportFormat, list, 'Delivery Report', exportIncludePhotos);
+                exportReport(exportFormat, list, 'Delivery Report', exportOptionalCols['Image'], exportOptionalCols);
               }}
             >
               <Text style={s.confirmBtnText}>Download Report</Text>
@@ -768,4 +795,12 @@ const s = StyleSheet.create({
   formatBtnTextActive: { color: '#2b4594' },
   confirmBtn:      { backgroundColor: '#2b4594', borderRadius: 12, paddingVertical: 13, alignItems: 'center', marginTop: 16 },
   confirmBtnText:  { color: '#fff', fontWeight: '800', fontSize: 15 },
+  modalSectionLabel: { fontSize: 11, fontWeight: '700', color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8, marginTop: 14 },
+  colGrid:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
+  colChip:         { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1.5, borderColor: '#cbd5e1', backgroundColor: '#f8fafc' },
+  colChipCheck:    { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, borderColor: '#cbd5e1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  colChipCheckActive: { backgroundColor: '#2b4594', borderColor: '#2b4594' },
+  colChipTick:     { color: '#fff', fontSize: 10, fontWeight: '800', lineHeight: 14 },
+  colChipLabel:    { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  colChipLabelActive: { color: '#1e3a8a' },
 });

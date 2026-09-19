@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.haalim.tripodservices",
-      "buildNumber": "21",
+      "buildNumber": "22",
       "infoPlist": {
         "NSCameraUsageDescription": "Camera is used to take visitor and delivery photos for verification.",
         "NSPhotoLibraryUsageDescription": "Photo library is used to select delivery and cargo pictures.",
